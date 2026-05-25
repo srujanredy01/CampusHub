@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Notifications — CampusHub</title>
+  <link rel="stylesheet" href="/assets/css/styles.css">
+</head>
+<body>
+  <div id="app" class="app-layout"></div>
+  <script src="/assets/js/api.js"></script>
+  <script src="/assets/js/app.js"></script>
+  <script src="/assets/js/layout.js"></script>
+  <script>
+    (function() {
+      if (!CampusHubAPI.isAuthenticated()) { window.location.href = '/login.html'; return; }
+      Layout.render('Notifications', false);
+      loadNotifications();
+
+      async function loadNotifications() {
+        const content = document.getElementById('page-content');
+        content.innerHTML = '<div class="page-loader"><div class="spinner spinner-lg"></div></div>';
+        try {
+          const res = await CampusHubAPI.get('/notifications/');
+          const items = res.results || res.data || [];
+          let html = '<div class="flex justify-between items-center" style="margin-bottom:1.5rem"><h2 style="font-size:1.125rem;font-weight:600">Your Notifications</h2><button class="btn btn-secondary btn-sm" onclick="markAllRead()">Mark all read</button></div>';
+          if (items.length === 0) {
+            html += '<div class="empty-state"><div class="empty-state-icon">🔔</div><div class="empty-state-title">No notifications</div><div class="empty-state-desc">You\'re all caught up!</div></div>';
+          } else {
+            html += '<div style="display:flex;flex-direction:column;gap:0.5rem">';
+            items.forEach(n => {
+              const unread = !n.is_read ? 'border-left:3px solid var(--primary-500);' : '';
+              html += `<div class="card" style="padding:1rem;${unread}"><div class="flex justify-between"><p style="font-size:0.875rem;font-weight:${n.is_read ? '400' : '600'};color:var(--slate-800)">${App.escapeHtml(n.title || n.message || '')}</p><span style="font-size:0.6875rem;color:var(--slate-400)">${App.formatDate(n.created_at)}</span></div>${n.body ? `<p style="font-size:0.8125rem;color:var(--slate-500);margin-top:0.25rem">${App.escapeHtml(n.body)}</p>` : ''}</div>`;
+            });
+            html += '</div>';
+          }
+          content.innerHTML = html;
+        } catch(err) {
+          content.innerHTML = '<div class="empty-state"><div class="empty-state-title">Failed to load notifications</div></div>';
+        }
+      }
+
+      window.markAllRead = async function() {
+        try { await CampusHubAPI.post('/notifications/mark-read'); Toast.success('All marked as read'); loadNotifications(); }
+        catch(e) { Toast.error('Failed to mark as read'); }
+      };
+    })();
+  </script>
+</body>
+</html>

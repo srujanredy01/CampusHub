@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard — CampusHub</title>
+  <link rel="stylesheet" href="/assets/css/styles.css">
+</head>
+<body>
+  <div id="app" class="app-layout"></div>
+  <script src="/assets/js/api.js"></script>
+  <script src="/assets/js/app.js"></script>
+  <script src="/assets/js/layout.js"></script>
+  <script>
+    (function() {
+      if (!CampusHubAPI.isAuthenticated()) { window.location.href = '/login.html'; return; }
+      const user = CampusHubAPI.getUser();
+      if (user?.role !== 'admin') { window.location.href = '/dashboard.html'; return; }
+      Layout.render('Admin Overview', true);
+      loadAdminDashboard();
+
+      async function loadAdminDashboard() {
+        const content = document.getElementById('page-content');
+        content.innerHTML = '<div class="page-loader"><div class="spinner spinner-lg"></div></div>';
+        try {
+          const res = await CampusHubAPI.get('/admin/dashboard');
+          const d = res.data || res;
+          content.innerHTML = `
+            <div class="hero-banner" style="margin-bottom:1.5rem">
+              <div style="position:relative;z-index:1"><h1 style="font-size:1.5rem;font-weight:700;color:#fff">Admin Dashboard</h1><p style="color:rgba(255,255,255,0.7);font-size:0.875rem">Manage your CampusHub platform</p></div>
+            </div>
+            <div class="card-grid card-grid-4" style="margin-bottom:1.5rem">
+              <div class="card stat-card"><div class="stat-value">${d.total_users || 0}</div><div class="stat-label">Total Users</div></div>
+              <div class="card stat-card"><div class="stat-value">${d.total_resources || 0}</div><div class="stat-label">Resources</div></div>
+              <div class="card stat-card"><div class="stat-value">${d.total_news || d.total_articles || 0}</div><div class="stat-label">News Articles</div></div>
+              <div class="card stat-card"><div class="stat-value">${d.total_questions || 0}</div><div class="stat-label">Coding Questions</div></div>
+            </div>
+            <div class="card-grid card-grid-3">
+              <a href="/admin-users.html" class="card" style="text-decoration:none;text-align:center"><div style="font-size:2rem;margin-bottom:0.5rem">👥</div><div style="font-weight:600;color:var(--slate-800)">Manage Users</div></a>
+              <a href="/admin-resources.html" class="card" style="text-decoration:none;text-align:center"><div style="font-size:2rem;margin-bottom:0.5rem">📚</div><div style="font-weight:600;color:var(--slate-800)">Manage Resources</div></a>
+              <a href="/admin-news.html" class="card" style="text-decoration:none;text-align:center"><div style="font-size:2rem;margin-bottom:0.5rem">📰</div><div style="font-weight:600;color:var(--slate-800)">Manage News</div></a>
+            </div>`;
+        } catch(err) {
+          content.innerHTML = `<div class="card"><h2 style="font-size:1.25rem;font-weight:600;margin-bottom:1rem">Admin Dashboard</h2><p style="color:var(--slate-500)">Welcome, administrator. Use the sidebar to manage the platform.</p></div>`;
+        }
+      }
+    })();
+  </script>
+</body>
+</html>

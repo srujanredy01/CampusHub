@@ -1,0 +1,78 @@
+# ─────────────────────────────────────────────────────────────────────────────
+#  CampusHub — Monitoring Stack (optional overlay)
+#  Usage:
+#    docker compose -f docker-compose.prod.yml -f docker-compose.monitoring.yml up -d --build
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+
+  # ── Prometheus ──────────────────────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    container_name: campushub_prometheus
+    restart: always
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=30d"
+      - "--web.enable-lifecycle"
+    networks:
+      - campushub_net
+
+  # ── Node Exporter (host metrics) ────────────────────────────────────────────
+  node_exporter:
+    image: prom/node-exporter:v1.8.0
+    container_name: campushub_node_exporter
+    restart: always
+    command:
+      - "--path.rootfs=/host"
+    volumes:
+      - /:/host:ro,rslave
+    networks:
+      - campushub_net
+
+  # ── cAdvisor (container metrics) ────────────────────────────────────────────
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    container_name: campushub_cadvisor
+    restart: always
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    networks:
+      - campushub_net
+
+  # ── Grafana (no external port — access via SSH tunnel) ──────────────────────
+  grafana:
+    image: grafana/grafana:10.4.0
+    container_name: campushub_grafana
+    restart: always
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-changeme_grafana_pass}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_ROOT_URL=http://localhost:3001
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana/datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro
+      - ./monitoring/grafana/dashboards/dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml:ro
+    ports:
+      - "127.0.0.1:3001:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - campushub_net
+
+volumes:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  campushub_net:
+    driver: bridge

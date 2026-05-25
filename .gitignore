@@ -1,0 +1,72 @@
+# ── Environment / Secrets ────────────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+backend/.env
+backend/.env.local
+# Templates are tracked (they contain placeholders, not real secrets)
+!.env.example
+!.env.production
+!backend/.env.example
+!backend/.env.production
+
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+parts/
+var/
+sdist/
+develop-eggs/
+.installed.cfg
+lib/
+lib64/
+*.so
+.venv/
+venv/
+env/
+ENV/
+
+# ── Django ────────────────────────────────────────────────────────────────────
+backend/staticfiles/
+backend/media/
+backend/logs/
+*.log
+
+# ── Node / Frontend ───────────────────────────────────────────────────────────
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+.npm/
+
+# ── Docker ────────────────────────────────────────────────────────────────────
+docker/nginx/ssl/
+docker/executor/__pycache__/
+
+# ── IDE / OS ──────────────────────────────────────────────────────────────────
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ── Testing ───────────────────────────────────────────────────────────────────
+.coverage
+htmlcov/
+.pytest_cache/
+test-results/
+playwright-report/
+coverage.xml
+
+# ── Jenkins (removed — using GitHub Actions) ─────────────────────────────────
+Jenkinsfile
+jenkins/

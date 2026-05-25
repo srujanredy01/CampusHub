@@ -1,0 +1,124 @@
+# ─────────────────────────────────────────────────────────────────────────────
+#  CampusHub — Production Docker Compose (AWS EC2)
+#  Usage:
+#    docker compose -f docker-compose.prod.yml up -d --build
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+
+  # ── PostgreSQL ──────────────────────────────────────────────────────────────
+  db:
+    image: postgres:15-alpine
+    container_name: campushub_db
+    restart: always
+    environment:
+      POSTGRES_DB: campushub
+      POSTGRES_USER: campushub_user
+      POSTGRES_PASSWORD: campushub_pass
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U campushub_user -d campushub"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - campushub_net
+
+  # ── Django Backend ──────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: campushub-backend:latest
+    container_name: campushub_backend
+    restart: always
+    env_file:
+      - ./backend/.env
+    environment:
+      - DB_HOST=db
+      - DB_PORT=5432
+    volumes:
+      - static_files:/app/staticfiles
+      - media_files:/app/media
+      - backend_logs:/app/logs
+    depends_on:
+      db:
+        condition: service_healthy
+    user: root
+    entrypoint: ["/bin/sh", "/app/entrypoint.prod.sh"]
+    command: []
+    networks:
+      - campushub_net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8000/api/health/ || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 120s
+
+  # ── Code Executor (sandbox) ─────────────────────────────────────────────────
+  executor:
+    build:
+      context: ./docker/executor
+      dockerfile: Dockerfile
+    image: campushub-executor:latest
+    container_name: campushub_executor
+    restart: always
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - campushub_net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8001/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 15s
+
+  # ── Static Frontend (HTML/CSS/JS served by Nginx) ────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+    image: campushub-frontend:latest
+    container_name: campushub_frontend
+    restart: always
+    networks:
+      - campushub_net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  # ── Nginx Reverse Proxy ─────────────────────────────────────────────────────
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: campushub_nginx
+    restart: always
+    ports:
+      - "80:80"
+    volumes:
+      - ./docker/nginx/nginx.prod.conf:/etc/nginx/nginx.conf:ro
+      - static_files:/app/staticfiles:ro
+      - media_files:/app/media:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+    networks:
+      - campushub_net
+
+volumes:
+  postgres_data:
+  static_files:
+  media_files:
+  backend_logs:
+
+networks:
+  campushub_net:
+    driver: bridge

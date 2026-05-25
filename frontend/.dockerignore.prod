@@ -1,0 +1,13 @@
+node_modules
+src
+dist
+.env
+.env.*
+package.json
+package-lock.json
+vite.config.mjs
+tailwind.config.js
+postcss.config.js
+*.md
+.git
+.gitignore

@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Resources — CampusHub</title>
+  <link rel="stylesheet" href="/assets/css/styles.css">
+</head>
+<body>
+  <div id="app" class="app-layout"></div>
+  <script src="/assets/js/api.js"></script>
+  <script src="/assets/js/app.js"></script>
+  <script src="/assets/js/layout.js"></script>
+  <script>
+    (function() {
+      if (!CampusHubAPI.isAuthenticated()) { window.location.href = '/login.html'; return; }
+      Layout.render('Academic Resources', false);
+      let currentPage = 1;
+      loadResources();
+
+      async function loadResources(page = 1) {
+        const content = document.getElementById('page-content');
+        if (page === 1) content.innerHTML = '<div class="page-loader"><div class="spinner spinner-lg"></div></div>';
+        try {
+          const res = await CampusHubAPI.get('/resources/', { page });
+          const items = res.results || res.data || [];
+          let html = `
+            <div class="flex justify-between items-center" style="margin-bottom:1.5rem">
+              <h2 style="font-size:1.125rem;font-weight:600">Study Materials</h2>
+            </div>`;
+          if (items.length === 0) {
+            html += '<div class="empty-state"><div class="empty-state-icon">📚</div><div class="empty-state-title">No resources yet</div><div class="empty-state-desc">Resources will appear here once uploaded.</div></div>';
+          } else {
+            html += '<div class="card-grid card-grid-2">';
+            items.forEach(r => {
+              html += `<div class="card"><h3 style="font-size:0.9375rem;font-weight:600;margin-bottom:0.5rem">${App.escapeHtml(r.title)}</h3><p style="font-size:0.8125rem;color:var(--slate-500);margin-bottom:0.75rem">${App.escapeHtml(r.description || '')}</p><div class="flex items-center gap-2"><span class="badge badge-info">${App.escapeHtml(r.subject || r.branch || '')}</span><span style="font-size:0.75rem;color:var(--slate-400)">${App.formatDate(r.created_at)}</span></div></div>`;
+            });
+            html += '</div>';
+          }
+          content.innerHTML = html;
+        } catch(err) {
+          content.innerHTML = '<div class="empty-state"><div class="empty-state-title">Failed to load resources</div><div class="empty-state-desc">' + App.escapeHtml(err.message) + '</div></div>';
+        }
+      }
+    })();
+  </script>
+</body>
+</html>

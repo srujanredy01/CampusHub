@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Notifications — CampusHub Admin</title>
+  <link rel="stylesheet" href="/assets/css/styles.css">
+</head>
+<body>
+  <div id="app" class="app-layout"></div>
+  <script src="/assets/js/api.js"></script>
+  <script src="/assets/js/app.js"></script>
+  <script src="/assets/js/layout.js"></script>
+  <script>
+    (function() {
+      if (!CampusHubAPI.isAuthenticated()) { window.location.href = '/login.html'; return; }
+      const user = CampusHubAPI.getUser();
+      if (user?.role !== 'admin') { window.location.href = '/dashboard.html'; return; }
+      Layout.render('Notifications', true);
+      const content = document.getElementById('page-content');
+      content.innerHTML = `
+        <div class="card">
+          <h2 style="font-size:1.125rem;font-weight:600;margin-bottom:1.5rem">Send Notification</h2>
+          <form id="notify-form">
+            <div class="form-group"><label class="form-label">Title</label><input type="text" id="n-title" class="form-input" placeholder="Notification title" required></div>
+            <div class="form-group"><label class="form-label">Message</label><textarea id="n-message" class="form-input" rows="4" placeholder="Notification message" required></textarea></div>
+            <div class="form-group"><label class="form-label">Target</label><select id="n-target" class="form-input"><option value="all">All Students</option><option value="branch">By Branch</option></select></div>
+            <button type="submit" class="btn btn-primary">Send Notification</button>
+          </form>
+        </div>`;
+      document.getElementById('notify-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        try {
+          await CampusHubAPI.post('/admin/notifications/send', {
+            title: document.getElementById('n-title').value,
+            message: document.getElementById('n-message').value,
+            target: document.getElementById('n-target').value,
+          });
+          Toast.success('Notification sent!');
+          e.target.reset();
+        } catch(err) { Toast.error(err.message || 'Failed to send notification.'); }
+      });
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,35 @@
+import api from "./api";
+
+export const codingService = {
+  getQuestions: (params) => api.get("/questions/", { params }),
+  getTags: () => api.get("/questions/tags"),
+  getCompanies: () => api.get("/questions/companies"),
+  getLeaderboard: () => api.get("/questions/leaderboard"),
+  getMyStats: () => api.get("/questions/my-stats"),
+  getQuestion: (id) => api.get(`/questions/${id}`),
+  getEditorial: (id) => api.get(`/questions/${id}/editorial`),
+  createQuestion: (data) => api.post("/questions/create", data),
+  updateQuestion: (id, data) => api.put(`/questions/${id}/manage`, data),
+  deleteQuestion: (id) => api.delete(`/questions/${id}/manage`),
+  saveQuestion: (question_id) => api.post("/questions/save", { question_id }),
+  unsaveQuestion: (id) => api.delete(`/questions/${id}/unsave`),
+  getSavedQuestions: () => api.get("/questions/saved"),
+  getSubmissions: (questionId) => api.get(`/questions/${questionId}/submissions`),
+  getDraft: (questionId, language) => api.get(`/questions/${questionId}/draft`, { params: { language } }),
+  saveDraft: (questionId, language, code) => api.put(`/questions/${questionId}/draft`, { language, code }),
+  getDiscussions: (questionId) => api.get(`/questions/${questionId}/discussions`),
+  postDiscussion: (questionId, data) => api.post(`/questions/${questionId}/discussions`, data),
+  getContests: (params) => api.get("/questions/contests", { params }),
+  getContest: (id) => api.get(`/questions/contests/${id}`),
+  registerContest: (id) => api.post(`/questions/contests/${id}/register`),
+  getContestLeaderboard: (id) => api.get(`/questions/contests/${id}/leaderboard`),
+  getContestSubmissions: (id) => api.get(`/questions/contests/${id}/submissions`),
+  submitContest: (id, contest_problem_id, language, code) =>
+    api.post(`/questions/contests/${id}/submit`, { contest_problem_id, language, code }),
+  createContest: (data) => api.post("/questions/contests/create", data),
+  updateContest: (id, data) => api.put(`/questions/contests/${id}/manage`, data),
+  deleteContest: (id) => api.delete(`/questions/contests/${id}/manage`),
+  runCode: (language, code, stdin) => api.post("/code/run", { language, code, stdin }),
+  submitCode: (question_id, language, code) =>
+    api.post("/code/submit", { question_id, language, code }),
+};

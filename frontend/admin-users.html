@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Manage Users — CampusHub Admin</title>
+  <link rel="stylesheet" href="/assets/css/styles.css">
+</head>
+<body>
+  <div id="app" class="app-layout"></div>
+  <script src="/assets/js/api.js"></script>
+  <script src="/assets/js/app.js"></script>
+  <script src="/assets/js/layout.js"></script>
+  <script>
+    (function() {
+      if (!CampusHubAPI.isAuthenticated()) { window.location.href = '/login.html'; return; }
+      const user = CampusHubAPI.getUser();
+      if (user?.role !== 'admin') { window.location.href = '/dashboard.html'; return; }
+      Layout.render('Student Management', true);
+      loadUsers();
+
+      async function loadUsers(page = 1) {
+        const content = document.getElementById('page-content');
+        content.innerHTML = '<div class="page-loader"><div class="spinner spinner-lg"></div></div>';
+        try {
+          const res = await CampusHubAPI.get('/admin/students', { page });
+          const items = res.results || res.data || [];
+          let html = `<div class="flex justify-between items-center" style="margin-bottom:1.5rem"><h2 style="font-size:1.125rem;font-weight:600">All Users</h2><span class="badge badge-info">${res.count || items.length} total</span></div>`;
+          html += '<div class="table-container"><table><thead><tr><th>Name</th><th>Student ID</th><th>Email</th><th>Branch</th><th>Role</th><th>Status</th></tr></thead><tbody>';
+          items.forEach(u => {
+            const statusBadge = u.is_active ? '<span class="badge badge-success">Active</span>' : '<span class="badge badge-danger">Inactive</span>';
+            html += `<tr><td style="font-weight:500">${App.escapeHtml(u.full_name)}</td><td>${App.escapeHtml(u.student_id || '')}</td><td style="font-size:0.8125rem">${App.escapeHtml(u.email)}</td><td>${App.escapeHtml(u.branch || '')}</td><td><span class="badge badge-info">${u.role}</span></td><td>${statusBadge}</td></tr>`;
+          });
+          html += '</tbody></table></div>';
+          content.innerHTML = html;
+        } catch(err) {
+          content.innerHTML = '<div class="empty-state"><div class="empty-state-title">Failed to load users</div><div class="empty-state-desc">' + App.escapeHtml(err.message) + '</div></div>';
+        }
+      }
+    })();
+  </script>
+</body>
+</html>

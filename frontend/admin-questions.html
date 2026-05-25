@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Manage Questions — CampusHub Admin</title>
+  <link rel="stylesheet" href="/assets/css/styles.css">
+</head>
+<body>
+  <div id="app" class="app-layout"></div>
+  <script src="/assets/js/api.js"></script>
+  <script src="/assets/js/app.js"></script>
+  <script src="/assets/js/layout.js"></script>
+  <script>
+    (function() {
+      if (!CampusHubAPI.isAuthenticated()) { window.location.href = '/login.html'; return; }
+      const user = CampusHubAPI.getUser();
+      if (user?.role !== 'admin') { window.location.href = '/dashboard.html'; return; }
+      Layout.render('Coding Management', true);
+      loadQuestions();
+
+      async function loadQuestions() {
+        const content = document.getElementById('page-content');
+        content.innerHTML = '<div class="page-loader"><div class="spinner spinner-lg"></div></div>';
+        try {
+          const res = await CampusHubAPI.get('/questions/');
+          const items = res.results || res.data || [];
+          let html = '<div class="flex justify-between items-center" style="margin-bottom:1.5rem"><h2 style="font-size:1.125rem;font-weight:600">Coding Questions</h2></div>';
+          html += '<div class="table-container"><table><thead><tr><th>Title</th><th>Difficulty</th><th>Topic</th><th>Submissions</th></tr></thead><tbody>';
+          items.forEach(q => {
+            const diffClass = q.difficulty === 'easy' ? 'badge-easy' : q.difficulty === 'medium' ? 'badge-medium' : 'badge-hard';
+            html += `<tr><td style="font-weight:500">${App.escapeHtml(q.title)}</td><td><span class="badge ${diffClass}">${q.difficulty}</span></td><td>${App.escapeHtml(q.topic || '')}</td><td>${q.total_submissions || 0}</td></tr>`;
+          });
+          html += '</tbody></table></div>';
+          content.innerHTML = html;
+        } catch(err) {
+          content.innerHTML = '<div class="empty-state"><div class="empty-state-title">Failed to load questions</div></div>';
+        }
+      }
+    })();
+  </script>
+</body>
+</html>

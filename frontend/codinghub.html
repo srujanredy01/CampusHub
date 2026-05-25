@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Coding Hub — CampusHub</title>
+  <link rel="stylesheet" href="/assets/css/styles.css">
+</head>
+<body>
+  <div id="app" class="app-layout"></div>
+  <script src="/assets/js/api.js"></script>
+  <script src="/assets/js/app.js"></script>
+  <script src="/assets/js/layout.js"></script>
+  <script>
+    (function() {
+      if (!CampusHubAPI.isAuthenticated()) { window.location.href = '/login.html'; return; }
+      Layout.render('Coding Hub', false);
+      loadQuestions();
+
+      async function loadQuestions(params = {}) {
+        const content = document.getElementById('page-content');
+        content.innerHTML = '<div class="page-loader"><div class="spinner spinner-lg"></div></div>';
+        try {
+          const res = await CampusHubAPI.get('/questions/', params);
+          const items = res.results || res.data || [];
+          let html = `
+            <div class="flex justify-between items-center" style="margin-bottom:1rem">
+              <h2 style="font-size:1.125rem;font-weight:600">Practice Problems</h2>
+            </div>
+            <div class="filter-group" style="margin-bottom:1.5rem">
+              <button class="filter-chip active" onclick="filterDifficulty('')">All</button>
+              <button class="filter-chip" onclick="filterDifficulty('easy')">Easy</button>
+              <button class="filter-chip" onclick="filterDifficulty('medium')">Medium</button>
+              <button class="filter-chip" onclick="filterDifficulty('hard')">Hard</button>
+            </div>`;
+          if (items.length === 0) {
+            html += '<div class="empty-state"><div class="empty-state-icon">💻</div><div class="empty-state-title">No problems available</div></div>';
+          } else {
+            html += '<div class="table-container"><table><thead><tr><th>Title</th><th>Difficulty</th><th>Topic</th><th>Acceptance</th></tr></thead><tbody>';
+            items.forEach(q => {
+              const diffClass = q.difficulty === 'easy' ? 'badge-easy' : q.difficulty === 'medium' ? 'badge-medium' : 'badge-hard';
+              html += `<tr style="cursor:pointer" onclick="viewQuestion('${q.id}')"><td style="font-weight:500">${App.escapeHtml(q.title)}</td><td><span class="badge ${diffClass}">${q.difficulty}</span></td><td style="font-size:0.8125rem;color:var(--slate-500)">${App.escapeHtml(q.topic || '')}</td><td style="font-size:0.8125rem">${q.acceptance_rate || 0}%</td></tr>`;
+            });
+            html += '</tbody></table></div>';
+          }
+          content.innerHTML = html;
+        } catch(err) {
+          content.innerHTML = '<div class="empty-state"><div class="empty-state-title">Failed to load problems</div></div>';
+        }
+      }
+
+      window.filterDifficulty = function(d) {
+        loadQuestions(d ? { difficulty: d } : {});
+      };
+      window.viewQuestion = function(id) {
+        window.location.href = `/coding-question.html?id=${id}`;
+      };
+    })();
+  </script>
+</body>
+</html>

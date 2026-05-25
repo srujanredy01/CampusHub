@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CampusHub</title>
+  <script>
+    // Redirect to appropriate page based on auth state
+    var token = localStorage.getItem('access_token');
+    if (token) {
+      try {
+        var user = JSON.parse(localStorage.getItem('user'));
+        window.location.replace(user && user.role === 'admin' ? '/admin.html' : '/dashboard.html');
+      } catch(e) { window.location.replace('/dashboard.html'); }
+    } else {
+      window.location.replace('/login.html');
+    }
+  </script>
+</head>
+<body></body>
+</html>

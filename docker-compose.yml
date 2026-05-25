@@ -1,0 +1,117 @@
+# ─────────────────────────────────────────────────────────────────────────────
+#  CampusHub — Local Development Docker Compose
+#  Run:  docker compose --env-file ./backend/.env up --build
+#  API:  http://localhost:8000/api/docs/
+#  App:  http://localhost  (Nginx → React + Django)
+#
+#  With monitoring:
+#    docker compose -f docker-compose.yml -f docker-compose.monitoring.yml --env-file ./backend/.env up --build
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+
+  # ── PostgreSQL ──────────────────────────────────────────────────────────────
+  db:
+    image: postgres:15-alpine
+    container_name: campushub_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: campushub
+      POSTGRES_USER: campushub_user
+      POSTGRES_PASSWORD: campushub_pass
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U campushub_user -d campushub"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - campushub_net
+
+  # ── Django Backend (ASGI with Daphne for WebSocket support) ─────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: campushub_backend
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    environment:
+      DB_HOST: db
+    volumes:
+      - ./backend:/app
+      - static_files:/app/staticfiles
+      - media_files:/app/media
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+             python manage.py createcachetable 2>/dev/null;
+             python manage.py collectstatic --noinput --clear &&
+             python manage.py create_admin --noinput &&
+             daphne -b 0.0.0.0 -p 8000 campushub.asgi:application"
+    networks:
+      - campushub_net
+
+  # ── Code Executor (sandbox) ─────────────────────────────────────────────────
+  executor:
+    build:
+      context: ./docker/executor
+      dockerfile: Dockerfile
+    container_name: campushub_executor
+    restart: unless-stopped
+    environment:
+      EXECUTOR_WORK_DIR: /executor_work
+      EXECUTOR_VOLUME_NAME: campushub_executor_work
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - executor_work:/executor_work
+    ports:
+      - "8001:8001"
+    networks:
+      - campushub_net
+
+  # ── React Frontend ──────────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: campushub_frontend
+    restart: unless-stopped
+    networks:
+      - campushub_net
+
+  # ── Nginx Reverse Proxy ─────────────────────────────────────────────────────
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: campushub_nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - static_files:/app/staticfiles:ro
+      - media_files:/app/media:ro
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - campushub_net
+
+volumes:
+  postgres_data:
+  static_files:
+  media_files:
+  executor_work:
+
+networks:
+  campushub_net:
+    driver: bridge

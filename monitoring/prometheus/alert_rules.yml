@@ -1,0 +1,112 @@
+groups:
+  - name: campushub_alerts
+    interval: 30s
+    rules:
+
+      # ── Service availability ─────────────────────────────────────────────────
+
+      - alert: BackendDown
+        expr: up{job="django"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "CampusHub backend is DOWN"
+          description: "Django backend has been unreachable for more than 1 minute."
+
+      - alert: ExecutorDown
+        expr: up{job="executor"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Code executor service is DOWN"
+          description: "The code execution service has been unreachable for more than 2 minutes."
+
+      # ── Error rate ───────────────────────────────────────────────────────────
+
+      - alert: HighErrorRate
+        expr: |
+          (
+            sum(rate(django_http_responses_total_by_status_total{status=~"5.."}[5m]))
+            /
+            sum(rate(django_http_responses_total_by_status_total[5m]))
+          ) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High 5xx error rate (>5%)"
+          description: "More than 5% of requests are returning 5xx errors."
+
+      - alert: CriticalErrorRate
+        expr: |
+          (
+            sum(rate(django_http_responses_total_by_status_total{status=~"5.."}[5m]))
+            /
+            sum(rate(django_http_responses_total_by_status_total[5m]))
+          ) > 0.20
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Critical 5xx error rate (>20%)"
+          description: "More than 20% of requests are returning 5xx errors."
+
+      # ── Latency ──────────────────────────────────────────────────────────────
+
+      - alert: HighAPILatency
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(django_http_requests_latency_seconds_by_view_method_bucket[5m])) by (le)
+          ) > 3
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High API latency (p95 > 3s)"
+          description: "95th percentile API response time exceeds 3 seconds."
+
+      # ── System resources ─────────────────────────────────────────────────────
+
+      - alert: HighCPUUsage
+        expr: 100 - (avg(rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 85
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage (>85%)"
+          description: "CPU usage has been above 85% for 10 minutes."
+
+      - alert: HighMemoryUsage
+        expr: |
+          (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes)
+          / node_memory_MemTotal_bytes * 100 > 90
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage (>90%)"
+          description: "Memory usage has been above 90% for 5 minutes."
+
+      - alert: DiskSpaceLow
+        expr: |
+          (node_filesystem_avail_bytes{mountpoint="/"}
+          / node_filesystem_size_bytes{mountpoint="/"}) * 100 < 15
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low disk space (<15% free)"
+          description: "Less than 15% disk space remaining on root filesystem."
+
+      # ── Database ─────────────────────────────────────────────────────────────
+
+      - alert: HighDBQueryRate
+        expr: rate(django_db_execute_total[5m]) > 1000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High database query rate (>1000/s)"
+          description: "Database is receiving more than 1000 queries per second."
