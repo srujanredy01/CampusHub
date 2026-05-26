@@ -1,6 +1,10 @@
 node_modules
+src
 dist
+.env
 .git
-.gitignore
 *.md
-.env.local
+package.json
+package-lock.json
+postcss.config.js
+tailwind.config.js

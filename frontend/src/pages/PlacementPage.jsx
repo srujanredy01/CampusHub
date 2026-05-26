@@ -1,342 +1,435 @@
-import { useEffect, useMemo, useState } from "react";
-import { useSelector } from "react-redux";
-import { toast } from "react-toastify";
+import React, { useState, useEffect } from "react";
 import { placementService } from "../services/placementService";
+import { toast } from "react-toastify";
 
-const STATUSES = [
-  ["applied", "Applied"],
-  ["shortlisted", "Shortlisted"],
-  ["interview", "Interview"],
-  ["offer", "Offer"],
-  ["accepted", "Accepted"],
-  ["rejected", "Rejected"],
-  ["withdrawn", "Withdrawn"],
+const STATUS_OPTIONS = [
+  { value: "wishlist", label: "Wishlist", color: "bg-gray-100 text-gray-700" },
+  { value: "applied", label: "Applied", color: "bg-blue-100 text-blue-700" },
+  { value: "oa_scheduled", label: "OA Scheduled", color: "bg-indigo-100 text-indigo-700" },
+  { value: "oa_completed", label: "OA Completed", color: "bg-purple-100 text-purple-700" },
+  { value: "shortlisted", label: "Shortlisted", color: "bg-cyan-100 text-cyan-700" },
+  { value: "interview_round_1", label: "Interview Round 1", color: "bg-amber-100 text-amber-700" },
+  { value: "interview_round_2", label: "Interview Round 2", color: "bg-orange-100 text-orange-700" },
+  { value: "hr_round", label: "HR Round", color: "bg-pink-100 text-pink-700" },
+  { value: "selected", label: "Selected", color: "bg-emerald-100 text-emerald-700" },
+  { value: "rejected", label: "Rejected", color: "bg-red-100 text-red-700" },
+  { value: "offer_received", label: "Offer Received", color: "bg-green-100 text-green-700" },
+  { value: "joined", label: "Joined", color: "bg-teal-100 text-teal-700" },
 ];
 
-function BarChart({ data, color = "bg-primary-500" }) {
-  const max = Math.max(1, ...data.map((d) => d.value || 0));
-  return (
-    <div className="space-y-2">
-      {data.map((d) => (
-        <div key={d.label} className="flex items-center gap-2">
-          <div className="w-24 text-xs text-slate-600">{d.label}</div>
-          <div className="flex-1 h-2 rounded-full bg-slate-100 overflow-hidden">
-            <div className={`h-full ${color}`} style={{ width: `${((d.value || 0) / max) * 100}%` }} />
-          </div>
-          <div className="w-8 text-xs text-slate-500 text-right">{d.value || 0}</div>
-        </div>
-      ))}
-    </div>
-  );
-}
+const JOB_TYPES = [
+  { value: "full_time", label: "Full Time" },
+  { value: "internship", label: "Internship" },
+  { value: "contract", label: "Contract" },
+];
 
-function AddApplicationModal({ companies, onClose, onAdded }) {
-  const [form, setForm] = useState({
-    company: "",
-    role: "",
-    status: "applied",
-    applied_date: "",
-    deadline: "",
-    package_lpa: "",
-    reminder_enabled: true,
-    notes: "",
-  });
-  const [newCompany, setNewCompany] = useState("");
-  const [saving, setSaving] = useState(false);
-
-  const submit = async (e) => {
-    e.preventDefault();
-    setSaving(true);
-    try {
-      let companyId = form.company;
-      if (!companyId && newCompany.trim()) {
-        const c = await placementService.createCompany({ name: newCompany.trim() });
-        companyId = c.data.data.id;
-      }
-      await placementService.createApplication({ ...form, company: companyId });
-      toast.success("Application added.");
-      onAdded();
-      onClose();
-    } catch (e2) {
-      const errs = e2.response?.data?.errors;
-      if (errs) Object.values(errs).flat().forEach((m) => toast.error(String(m)));
-      else toast.error(e2.response?.data?.error?.message || "Failed to add.");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
-      <form onSubmit={submit} onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl w-full max-w-xl p-5 space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-base font-bold text-slate-900">Add Application</h2>
-          <button type="button" onClick={onClose} className="text-slate-400">✕</button>
-        </div>
-        <select className="input-field" value={form.company} onChange={(e) => setForm((f) => ({ ...f, company: e.target.value }))}>
-          <option value="">Select existing company</option>
-          {companies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
-        <input className="input-field" placeholder="Or add new company name" value={newCompany} onChange={(e) => setNewCompany(e.target.value)} />
-        <input className="input-field" placeholder="Role" value={form.role} onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))} required />
-        <div className="grid grid-cols-2 gap-2">
-          <select className="input-field" value={form.status} onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}>
-            {STATUSES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-          </select>
-          <input type="number" step="0.01" className="input-field" placeholder="Package LPA" value={form.package_lpa} onChange={(e) => setForm((f) => ({ ...f, package_lpa: e.target.value }))} />
-          <input type="date" className="input-field" value={form.applied_date} onChange={(e) => setForm((f) => ({ ...f, applied_date: e.target.value }))} />
-          <input type="date" className="input-field" value={form.deadline} onChange={(e) => setForm((f) => ({ ...f, deadline: e.target.value }))} />
-        </div>
-        <label className="flex items-center gap-2 text-sm text-slate-600">
-          <input type="checkbox" checked={form.reminder_enabled} onChange={(e) => setForm((f) => ({ ...f, reminder_enabled: e.target.checked }))} />
-          Enable deadline reminders
-        </label>
-        <textarea className="input-field resize-none" rows={2} placeholder="Notes" value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} />
-        <button disabled={saving} className="w-full py-2.5 bg-primary-600 text-white rounded-xl font-semibold">{saving ? "Saving..." : "Save Application"}</button>
-      </form>
-    </div>
-  );
-}
-
-function AddRoundModal({ app, onClose, onAdded }) {
-  const [form, setForm] = useState({ round_number: (app.rounds?.length || 0) + 1, round_type: "technical", round_date: "", result: "pending", feedback: "" });
-  const [saving, setSaving] = useState(false);
-
-  const submit = async (e) => {
-    e.preventDefault();
-    setSaving(true);
-    try {
-      await placementService.addRound(app.id, form);
-      toast.success("Round added.");
-      onAdded();
-      onClose();
-    } catch (e2) {
-      toast.error(e2.response?.data?.error?.message || "Failed to add round.");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
-      <form onSubmit={submit} onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl w-full max-w-md p-5 space-y-3">
-        <h2 className="text-base font-bold text-slate-900">Add Round · {app.company_name}</h2>
-        <div className="grid grid-cols-2 gap-2">
-          <input type="number" min={1} className="input-field" value={form.round_number} onChange={(e) => setForm((f) => ({ ...f, round_number: Number(e.target.value) }))} />
-          <select className="input-field" value={form.round_type} onChange={(e) => setForm((f) => ({ ...f, round_type: e.target.value }))}>
-            <option value="online_test">Online Test</option>
-            <option value="coding">Coding</option>
-            <option value="technical">Technical</option>
-            <option value="hr">HR</option>
-            <option value="group_discussion">Group Discussion</option>
-            <option value="other">Other</option>
-          </select>
-          <input type="date" className="input-field" value={form.round_date} onChange={(e) => setForm((f) => ({ ...f, round_date: e.target.value }))} />
-          <select className="input-field" value={form.result} onChange={(e) => setForm((f) => ({ ...f, result: e.target.value }))}>
-            <option value="pending">Pending</option>
-            <option value="cleared">Cleared</option>
-            <option value="failed">Failed</option>
-          </select>
-        </div>
-        <textarea className="input-field resize-none" rows={2} placeholder="Feedback" value={form.feedback} onChange={(e) => setForm((f) => ({ ...f, feedback: e.target.value }))} />
-        <div className="flex gap-2">
-          <button type="button" onClick={onClose} className="flex-1 py-2 bg-slate-100 rounded-lg">Cancel</button>
-          <button disabled={saving} className="flex-1 py-2 bg-primary-600 text-white rounded-lg">{saving ? "Saving..." : "Add Round"}</button>
-        </div>
-      </form>
-    </div>
-  );
-}
-
-function ApplicationCard({ app, onStatus, onDelete, onRound }) {
-  return (
-    <div className="bg-white rounded-xl border border-slate-100 p-3 space-y-2">
-      <div className="flex items-start justify-between gap-2">
-        <div>
-          <p className="font-semibold text-sm text-slate-800">{app.company_name}</p>
-          <p className="text-xs text-slate-500">{app.role}</p>
-        </div>
-        <button onClick={() => onDelete(app.id)} className="text-xs text-red-500">Delete</button>
-      </div>
-      <p className="text-xs text-slate-500">Deadline: {app.deadline || "N/A"} {app.days_left != null ? `(${app.days_left}d)` : ""}</p>
-      <div className="grid grid-cols-2 gap-1">
-        <select className="input-field text-xs" value={app.status} onChange={(e) => onStatus(app.id, e.target.value)}>
-          {STATUSES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-        </select>
-        <button onClick={() => onRound(app)} className="text-xs bg-primary-50 text-primary-600 rounded-lg">+ Round</button>
-      </div>
-      {!!app.rounds?.length && (
-        <div className="space-y-1">
-          {app.rounds.slice(0, 3).map((r) => (
-            <div key={r.id} className="text-xs bg-slate-50 rounded p-1.5 flex justify-between">
-              <span>{r.round_type} #{r.round_number}</span>
-              <span>{r.result}</span>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-export default function PlacementPage() {
-  const { user } = useSelector((s) => s.auth);
-  const isAdmin = user?.role === "admin";
-  const [apps, setApps] = useState([]);
-  const [companies, setCompanies] = useState([]);
+function PlacementPage() {
+  const [applications, setApplications] = useState([]);
   const [stats, setStats] = useState(null);
-  const [adminAnalytics, setAdminAnalytics] = useState(null);
+  const [readiness, setReadiness] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [showAdd, setShowAdd] = useState(false);
-  const [roundApp, setRoundApp] = useState(null);
-  const [activeTab, setActiveTab] = useState("kanban");
+  const [showForm, setShowForm] = useState(false);
+  const [editingApp, setEditingApp] = useState(null);
+  const [activeTab, setActiveTab] = useState("list");
+  const [filterStatus, setFilterStatus] = useState("");
+  const [formData, setFormData] = useState({
+    company_name: "", role: "", package_lpa: "", status: "wishlist",
+    application_date: "", deadline: "", job_link: "", location: "",
+    job_type: "full_time", notes: "",
+  });
 
-  const load = async () => {
+  useEffect(() => {
+    loadData();
+  }, [filterStatus]);
+
+  const loadData = async () => {
     setLoading(true);
     try {
-      const [a, c, s] = await Promise.all([
-        placementService.getApplications(),
-        placementService.getCompanies(),
+      const params = filterStatus ? { status: filterStatus } : {};
+      const [appsRes, statsRes, readinessRes] = await Promise.all([
+        placementService.getApplications(params),
         placementService.getStats(),
+        placementService.getReadiness(),
       ]);
-      setApps(a.data.results || a.data.data || []);
-      setCompanies(c.data.results || c.data.data || []);
-      setStats(s.data.data || null);
-      if (isAdmin) {
-        const ad = await placementService.getAdminAnalytics();
-        setAdminAnalytics(ad.data.data || null);
-      }
-    } catch (e) {
-      toast.error(e.response?.data?.error?.message || "Failed to load placement data.");
+      setApplications(appsRes.data.results || appsRes.data.data || []);
+      setStats(statsRes.data.data);
+      setReadiness(readinessRes.data.data);
+    } catch (error) {
+      toast.error("Failed to load placement data");
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    load();
-  }, [isAdmin]);
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    const payload = { ...formData };
+    if (!payload.package_lpa) delete payload.package_lpa;
+    else payload.package_lpa = parseFloat(payload.package_lpa);
+    if (!payload.application_date) delete payload.application_date;
+    if (!payload.deadline) delete payload.deadline;
 
-  const updateStatus = async (id, status) => {
     try {
-      await placementService.updateApplication(id, { status });
-      setApps((prev) => prev.map((x) => (x.id === id ? { ...x, status } : x)));
-    } catch {
-      toast.error("Failed to update status.");
+      if (editingApp) {
+        await placementService.updateApplication(editingApp.id, payload);
+        toast.success("Application updated");
+      } else {
+        await placementService.createApplication(payload);
+        toast.success("Application added");
+      }
+      setShowForm(false);
+      setEditingApp(null);
+      resetForm();
+      loadData();
+    } catch (error) {
+      toast.error(error.response?.data?.error?.message || "Failed to save");
     }
   };
 
-  const remove = async (id) => {
+  const handleDelete = async (id) => {
     if (!window.confirm("Delete this application?")) return;
     try {
       await placementService.deleteApplication(id);
-      setApps((prev) => prev.filter((x) => x.id !== id));
+      toast.success("Application deleted");
+      loadData();
     } catch {
-      toast.error("Delete failed.");
+      toast.error("Failed to delete");
     }
   };
 
-  const statusMap = useMemo(() => {
-    const map = {};
-    STATUSES.forEach(([k]) => (map[k] = []));
-    apps.forEach((a) => {
-      if (!map[a.status]) map[a.status] = [];
-      map[a.status].push(a);
+  const handleEdit = (app) => {
+    setEditingApp(app);
+    setFormData({
+      company_name: app.company_name, role: app.role,
+      package_lpa: app.package_lpa || "", status: app.status,
+      application_date: app.application_date || "", deadline: app.deadline || "",
+      job_link: app.job_link || "", location: app.location || "",
+      job_type: app.job_type || "full_time", notes: app.notes || "",
     });
-    return map;
-  }, [apps]);
+    setShowForm(true);
+  };
+
+  const handleStatusChange = async (id, newStatus) => {
+    try {
+      await placementService.updateApplication(id, { status: newStatus });
+      toast.success("Status updated");
+      loadData();
+    } catch {
+      toast.error("Failed to update status");
+    }
+  };
+
+  const resetForm = () => {
+    setFormData({
+      company_name: "", role: "", package_lpa: "", status: "wishlist",
+      application_date: "", deadline: "", job_link: "", location: "",
+      job_type: "full_time", notes: "",
+    });
+  };
+
+  const getStatusBadge = (statusVal) => {
+    const opt = STATUS_OPTIONS.find((s) => s.value === statusVal);
+    return opt ? (
+      <span className={`px-2 py-1 rounded-full text-xs font-medium ${opt.color}`}>
+        {opt.label}
+      </span>
+    ) : null;
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" />
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-5 animate-fade-up">
+    <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Placement Tracker</h1>
-          <p className="text-sm text-slate-500">Track applications, rounds, deadlines, offers, and outcomes.</p>
+          <h1 className="text-2xl font-bold text-gray-900">Placement Tracker</h1>
+          <p className="text-gray-500 mt-1">Track your placement journey</p>
         </div>
-        <button onClick={() => setShowAdd(true)} className="px-4 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-sm font-semibold">Add Application</button>
+        <button
+          onClick={() => { setShowForm(true); setEditingApp(null); resetForm(); }}
+          className="px-4 py-2 bg-primary-600 text-white rounded-xl hover:bg-primary-700 transition font-medium"
+        >
+          + Add Application
+        </button>
       </div>
 
-      <div className="flex gap-2">
-        <button onClick={() => setActiveTab("kanban")} className={`px-3 py-1.5 rounded-lg text-sm ${activeTab === "kanban" ? "bg-slate-800 text-white" : "bg-slate-100 text-slate-600"}`}>Kanban</button>
-        <button onClick={() => setActiveTab("charts")} className={`px-3 py-1.5 rounded-lg text-sm ${activeTab === "charts" ? "bg-slate-800 text-white" : "bg-slate-100 text-slate-600"}`}>Charts</button>
-        {isAdmin && <button onClick={() => setActiveTab("admin")} className={`px-3 py-1.5 rounded-lg text-sm ${activeTab === "admin" ? "bg-slate-800 text-white" : "bg-slate-100 text-slate-600"}`}>Admin</button>}
-      </div>
-
-      {loading ? (
-        <div className="py-16 text-center text-slate-500">Loading placement dashboard...</div>
-      ) : (
-        <>
-          {activeTab === "kanban" && (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-              {STATUSES.map(([k, label]) => (
-                <div key={k} className="bg-slate-50 border border-slate-100 rounded-2xl p-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-sm font-semibold text-slate-700">{label}</h3>
-                    <span className="text-xs text-slate-400">{statusMap[k]?.length || 0}</span>
-                  </div>
-                  <div className="space-y-2 min-h-[80px]">
-                    {(statusMap[k] || []).map((app) => (
-                      <ApplicationCard key={app.id} app={app} onStatus={updateStatus} onDelete={remove} onRound={setRoundApp} />
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {activeTab === "charts" && (
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-              <div className="bg-white rounded-2xl border border-slate-100 p-4">
-                <h3 className="text-sm font-semibold text-slate-800 mb-3">Application Status Distribution</h3>
-                <BarChart
-                  data={STATUSES.map(([k, l]) => ({ label: l, value: stats?.by_status?.[k] || 0 }))}
-                />
-              </div>
-              <div className="bg-white rounded-2xl border border-slate-100 p-4">
-                <h3 className="text-sm font-semibold text-slate-800 mb-3">Summary</h3>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="bg-slate-50 rounded-xl p-3"><p className="text-xs text-slate-500">Total</p><p className="text-2xl font-bold">{stats?.total_applications || 0}</p></div>
-                  <div className="bg-slate-50 rounded-xl p-3"><p className="text-xs text-slate-500">Offer Rate</p><p className="text-2xl font-bold">{stats?.offer_rate || 0}%</p></div>
-                  <div className="bg-slate-50 rounded-xl p-3"><p className="text-xs text-slate-500">Avg Package</p><p className="text-2xl font-bold">{stats?.average_package_lpa || 0}</p></div>
-                  <div className="bg-slate-50 rounded-xl p-3"><p className="text-xs text-slate-500">Active Deadlines</p><p className="text-2xl font-bold">{stats?.active_deadline_count || 0}</p></div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {isAdmin && activeTab === "admin" && (
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-              <div className="bg-white rounded-2xl border border-slate-100 p-4">
-                <h3 className="text-sm font-semibold text-slate-800 mb-3">Placement Analytics</h3>
-                <BarChart
-                  data={STATUSES.map(([k, l]) => ({ label: l, value: adminAnalytics?.by_status?.[k] || 0 }))}
-                  color="bg-emerald-500"
-                />
-                <div className="grid grid-cols-2 gap-2 mt-4">
-                  <div className="bg-slate-50 rounded-lg p-2 text-xs">Total: <b>{adminAnalytics?.total_applications || 0}</b></div>
-                  <div className="bg-slate-50 rounded-lg p-2 text-xs">Offers: <b>{adminAnalytics?.offer_count || 0}</b></div>
-                  <div className="bg-slate-50 rounded-lg p-2 text-xs">Accepted: <b>{adminAnalytics?.accepted_count || 0}</b></div>
-                  <div className="bg-slate-50 rounded-lg p-2 text-xs">Rejected: <b>{adminAnalytics?.rejected_count || 0}</b></div>
-                </div>
-              </div>
-              <div className="bg-white rounded-2xl border border-slate-100 p-4">
-                <h3 className="text-sm font-semibold text-slate-800 mb-3">Top Companies</h3>
-                <div className="space-y-2">
-                  {(adminAnalytics?.top_companies || []).map((c) => (
-                    <div key={c.company} className="flex items-center justify-between text-sm bg-slate-50 rounded-lg px-3 py-2">
-                      <span>{c.company}</span>
-                      <span className="text-slate-500">{c.applications} apps · {c.offers} offers</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-        </>
+      {/* Stats Cards */}
+      {stats && (
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <StatCard label="Total" value={stats.total_applications} color="blue" />
+          <StatCard label="Interviews" value={stats.interviews_count} color="amber" />
+          <StatCard label="Offers" value={stats.offers} color="green" />
+          <StatCard label="Rejected" value={stats.rejections} color="red" />
+          <StatCard label="Wishlist" value={stats.wishlist} color="gray" />
+        </div>
       )}
 
-      {showAdd && <AddApplicationModal companies={companies} onClose={() => setShowAdd(false)} onAdded={load} />}
-      {roundApp && <AddRoundModal app={roundApp} onClose={() => setRoundApp(null)} onAdded={load} />}
+      {/* Readiness Score */}
+      {readiness && (
+        <div className="bg-white rounded-2xl p-6 shadow-card border border-gray-100">
+          <h3 className="font-semibold text-gray-900 mb-4">Placement Readiness Score</h3>
+          <div className="flex items-center gap-6 mb-4">
+            <div className="relative w-20 h-20">
+              <svg className="w-20 h-20 transform -rotate-90" viewBox="0 0 36 36">
+                <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                  fill="none" stroke="#e5e7eb" strokeWidth="3" />
+                <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                  fill="none" stroke="#4f46e5" strokeWidth="3"
+                  strokeDasharray={`${readiness.overall_score}, 100`} />
+              </svg>
+              <span className="absolute inset-0 flex items-center justify-center text-lg font-bold text-primary-600">
+                {readiness.overall_score}%
+              </span>
+            </div>
+            <div className="flex-1 grid grid-cols-2 md:grid-cols-3 gap-3">
+              <ReadinessItem label="Resume" value={readiness.resume_completion} />
+              <ReadinessItem label="Coding" value={readiness.coding_solved} />
+              <ReadinessItem label="Roadmap" value={readiness.roadmap_progress} />
+              <ReadinessItem label="Profile" value={readiness.profile_completion} />
+              <ReadinessItem label="Contests" value={readiness.contests_participated} />
+              <ReadinessItem label="Assignments" value={readiness.assignments_completed} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Tabs */}
+      <div className="flex gap-2 border-b border-gray-200">
+        {["list", "kanban"].map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`px-4 py-2 font-medium capitalize transition ${
+              activeTab === tab
+                ? "text-primary-600 border-b-2 border-primary-600"
+                : "text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            {tab === "list" ? "List View" : "Kanban Board"}
+          </button>
+        ))}
+      </div>
+
+      {/* Filter */}
+      <div className="flex gap-3 items-center">
+        <select
+          value={filterStatus}
+          onChange={(e) => setFilterStatus(e.target.value)}
+          className="px-3 py-2 border border-gray-200 rounded-lg text-sm"
+        >
+          <option value="">All Statuses</option>
+          {STATUS_OPTIONS.map((s) => (
+            <option key={s.value} value={s.value}>{s.label}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Applications List */}
+      {activeTab === "list" && (
+        <div className="space-y-3">
+          {applications.length === 0 ? (
+            <div className="text-center py-12 text-gray-500">
+              <p className="text-lg">No applications yet</p>
+              <p className="text-sm mt-1">Start tracking your placement journey</p>
+            </div>
+          ) : (
+            applications.map((app) => (
+              <div key={app.id} className="bg-white rounded-xl p-4 shadow-card border border-gray-100 hover:shadow-card-hover transition">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3">
+                      <h3 className="font-semibold text-gray-900">{app.company_name}</h3>
+                      {getStatusBadge(app.status)}
+                    </div>
+                    <p className="text-sm text-gray-600 mt-1">{app.role}</p>
+                    <div className="flex gap-4 mt-2 text-xs text-gray-500">
+                      {app.package_lpa && <span>₹{app.package_lpa} LPA</span>}
+                      {app.location && <span>📍 {app.location}</span>}
+                      {app.days_left !== null && app.days_left >= 0 && (
+                        <span className="text-amber-600">{app.days_left} days left</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <select
+                      value={app.status}
+                      onChange={(e) => handleStatusChange(app.id, e.target.value)}
+                      className="text-xs border border-gray-200 rounded-lg px-2 py-1"
+                    >
+                      {STATUS_OPTIONS.map((s) => (
+                        <option key={s.value} value={s.value}>{s.label}</option>
+                      ))}
+                    </select>
+                    <button onClick={() => handleEdit(app)} className="text-gray-400 hover:text-primary-600 text-sm">✏️</button>
+                    <button onClick={() => handleDelete(app.id)} className="text-gray-400 hover:text-red-600 text-sm">🗑️</button>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
+      {/* Kanban View */}
+      {activeTab === "kanban" && <KanbanBoard applications={applications} onStatusChange={handleStatusChange} />}
+
+      {/* Add/Edit Form Modal */}
+      {showForm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <h2 className="text-xl font-bold mb-4">
+              {editingApp ? "Edit Application" : "Add Application"}
+            </h2>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Company Name *</label>
+                  <input type="text" required value={formData.company_name}
+                    onChange={(e) => setFormData({ ...formData, company_name: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent" />
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Role *</label>
+                  <input type="text" required value={formData.role}
+                    onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Package (LPA)</label>
+                  <input type="number" step="0.01" value={formData.package_lpa}
+                    onChange={(e) => setFormData({ ...formData, package_lpa: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                  <select value={formData.status}
+                    onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent">
+                    {STATUS_OPTIONS.map((s) => (
+                      <option key={s.value} value={s.value}>{s.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Application Date</label>
+                  <input type="date" value={formData.application_date}
+                    onChange={(e) => setFormData({ ...formData, application_date: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Deadline</label>
+                  <input type="date" value={formData.deadline}
+                    onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
+                  <input type="text" value={formData.location}
+                    onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Job Type</label>
+                  <select value={formData.job_type}
+                    onChange={(e) => setFormData({ ...formData, job_type: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent">
+                    {JOB_TYPES.map((t) => (
+                      <option key={t.value} value={t.value}>{t.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Job Link</label>
+                  <input type="url" value={formData.job_link}
+                    onChange={(e) => setFormData({ ...formData, job_link: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent" />
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                  <textarea rows={3} value={formData.notes}
+                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent" />
+                </div>
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button type="submit" className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-xl hover:bg-primary-700 transition font-medium">
+                  {editingApp ? "Update" : "Add Application"}
+                </button>
+                <button type="button" onClick={() => { setShowForm(false); setEditingApp(null); }}
+                  className="px-4 py-2 border border-gray-200 rounded-xl hover:bg-gray-50 transition">
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
+function StatCard({ label, value, color }) {
+  const colors = {
+    blue: "bg-blue-50 text-blue-700",
+    amber: "bg-amber-50 text-amber-700",
+    green: "bg-green-50 text-green-700",
+    red: "bg-red-50 text-red-700",
+    gray: "bg-gray-50 text-gray-700",
+  };
+  return (
+    <div className={`rounded-xl p-4 ${colors[color]}`}>
+      <p className="text-2xl font-bold">{value || 0}</p>
+      <p className="text-sm opacity-80">{label}</p>
+    </div>
+  );
+}
+
+function ReadinessItem({ label, value }) {
+  return (
+    <div>
+      <div className="flex justify-between text-xs text-gray-600 mb-1">
+        <span>{label}</span>
+        <span>{value}%</span>
+      </div>
+      <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+        <div className="h-full bg-primary-500 rounded-full transition-all" style={{ width: `${value}%` }} />
+      </div>
+    </div>
+  );
+}
+
+function KanbanBoard({ applications, onStatusChange }) {
+  const columns = STATUS_OPTIONS.slice(0, 6); // Show first 6 statuses in kanban
+  return (
+    <div className="flex gap-4 overflow-x-auto pb-4">
+      {columns.map((col) => {
+        const items = applications.filter((a) => a.status === col.value);
+        return (
+          <div key={col.value} className="min-w-[250px] flex-shrink-0">
+            <div className={`px-3 py-2 rounded-t-lg ${col.color} font-medium text-sm`}>
+              {col.label} ({items.length})
+            </div>
+            <div className="bg-gray-50 rounded-b-lg p-2 space-y-2 min-h-[200px]">
+              {items.map((app) => (
+                <div key={app.id} className="bg-white rounded-lg p-3 shadow-sm border border-gray-100">
+                  <p className="font-medium text-sm text-gray-900">{app.company_name}</p>
+                  <p className="text-xs text-gray-500">{app.role}</p>
+                  {app.package_lpa && <p className="text-xs text-green-600 mt-1">₹{app.package_lpa} LPA</p>}
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+export default PlacementPage;

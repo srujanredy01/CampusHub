@@ -14,7 +14,7 @@ services:
     environment:
       POSTGRES_DB: campushub
       POSTGRES_USER: campushub_user
-      POSTGRES_PASSWORD: campushub_pass
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-campushub_pass}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
@@ -23,6 +23,22 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    networks:
+      - campushub_net
+
+  # ── Redis ───────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: campushub_redis
+    restart: always
+    command: redis-server --maxmemory 128mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
     networks:
       - campushub_net
 
@@ -39,12 +55,17 @@ services:
     environment:
       - DB_HOST=db
       - DB_PORT=5432
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/2
+      - CELERY_RESULT_BACKEND=redis://redis:6379/3
     volumes:
       - static_files:/app/staticfiles
       - media_files:/app/media
       - backend_logs:/app/logs
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     user: root
     entrypoint: ["/bin/sh", "/app/entrypoint.prod.sh"]
@@ -57,6 +78,62 @@ services:
       timeout: 10s
       retries: 10
       start_period: 120s
+
+  # ── Celery Worker ───────────────────────────────────────────────────────────
+  celery:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: campushub-backend:latest
+    container_name: campushub_celery
+    restart: always
+    env_file:
+      - ./backend/.env
+    environment:
+      - DB_HOST=db
+      - DB_PORT=5432
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/2
+      - CELERY_RESULT_BACKEND=redis://redis:6379/3
+    command: celery -A campushub worker --loglevel=info --concurrency=2
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - campushub_net
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A campushub inspect ping --timeout 5 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # ── Celery Beat (scheduler) ─────────────────────────────────────────────────
+  celery-beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: campushub-backend:latest
+    container_name: campushub_celery_beat
+    restart: always
+    env_file:
+      - ./backend/.env
+    environment:
+      - DB_HOST=db
+      - DB_PORT=5432
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/2
+      - CELERY_RESULT_BACKEND=redis://redis:6379/3
+    command: celery -A campushub beat --loglevel=info --schedule=/tmp/celerybeat-schedule
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - campushub_net
 
   # ── Code Executor (sandbox) ─────────────────────────────────────────────────
   executor:
@@ -77,11 +154,11 @@ services:
       retries: 5
       start_period: 15s
 
-  # ── Static Frontend (HTML/CSS/JS served by Nginx) ────────────────────────────
+  # ── React Frontend (Vite build → Nginx) ─────────────────────────────────────
   frontend:
     build:
       context: ./frontend
-      dockerfile: Dockerfile.prod
+      dockerfile: Dockerfile
     image: campushub-frontend:latest
     container_name: campushub_frontend
     restart: always
@@ -92,7 +169,7 @@ services:
       interval: 15s
       timeout: 5s
       retries: 5
-      start_period: 5s
+      start_period: 30s
 
   # ── Nginx Reverse Proxy ─────────────────────────────────────────────────────
   nginx:
@@ -118,6 +195,7 @@ volumes:
   static_files:
   media_files:
   backend_logs:
+  redis_data:
 
 networks:
   campushub_net:

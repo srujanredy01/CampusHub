@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Coding Management | CampusHub Admin</title>
+    <link rel="stylesheet" href="/assets/css/variables.css">
+    <link rel="stylesheet" href="/assets/css/base.css">
+    <link rel="stylesheet" href="/assets/css/components.css">
+    <link rel="stylesheet" href="/assets/css/utilities.css">
+    <link rel="stylesheet" href="/assets/css/layout.css">
+</head>
+<body>
+    <div class="app-layout" id="app"></div>
+    <script src="/assets/js/config.js"></script>
+    <script src="/assets/js/api.js"></script>
+    <script src="/assets/js/auth.js"></script>
+    <script src="/assets/js/utils.js"></script>
+    <script src="/assets/js/components.js"></script>
+    <script>
+        if (!Auth.requireAdmin()) throw new Error('Not admin');
+        Components.initLayout('coding', 'Coding Management');
+        loadAdminCoding();
+
+        async function loadAdminCoding() {
+            const content = document.getElementById('pageContent');
+            try {
+                const data = await API.get('/admin/questions');
+                const questions = data?.data?.results || data?.data || [];
+
+                content.innerHTML = `
+                <div class="animate-fade-in">
+                    <div class="flex items-center justify-between mb-6">
+                        <p class="text-sm text-gray-500">${questions.length} problems</p>
+                        <button class="btn btn-primary" onclick="window.location.href='/pages/admin/coding-create.html'">+ Add Problem</button>
+                    </div>
+                    <div class="card">
+                        <div class="table-container">
+                            <table class="data-table">
+                                <thead><tr><th>Title</th><th>Difficulty</th><th>Submissions</th><th>Acceptance</th><th>Status</th></tr></thead>
+                                <tbody>
+                                    ${questions.map(q => `
+                                        <tr>
+                                            <td class="font-medium">${Utils.escapeHtml(q.title)}</td>
+                                            <td><span class="badge badge-${Utils.getDifficultyColor(q.difficulty)}">${q.difficulty}</span></td>
+                                            <td>${q.submission_count || 0}</td>
+                                            <td>${q.acceptance_rate || 0}%</td>
+                                            <td><span class="badge badge-${q.is_active ? 'success' : 'gray'}">${q.is_active ? 'Active' : 'Draft'}</span></td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>`;
+            } catch (e) { content.innerHTML = `<p class="text-danger">${e.message}</p>`; }
+        }
+    </script>
+</body>
+</html>

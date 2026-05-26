@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard | CampusHub</title>
+    <link rel="stylesheet" href="/assets/css/variables.css">
+    <link rel="stylesheet" href="/assets/css/base.css">
+    <link rel="stylesheet" href="/assets/css/components.css">
+    <link rel="stylesheet" href="/assets/css/utilities.css">
+    <link rel="stylesheet" href="/assets/css/layout.css">
+</head>
+<body>
+    <div class="app-layout" id="app"></div>
+    <script src="/assets/js/config.js"></script>
+    <script src="/assets/js/api.js"></script>
+    <script src="/assets/js/auth.js"></script>
+    <script src="/assets/js/utils.js"></script>
+    <script src="/assets/js/components.js"></script>
+    <script>
+        if (!Auth.requireAdmin()) throw new Error('Not admin');
+        Components.initLayout('dashboard', 'Admin Dashboard');
+        loadAdminDashboard();
+
+        async function loadAdminDashboard() {
+            const content = document.getElementById('pageContent');
+            try {
+                const data = await API.get('/admin/dashboard');
+                const stats = data?.data || {};
+
+                content.innerHTML = `
+                <div class="animate-fade-in">
+                    <div class="mb-6">
+                        <h2 class="text-2xl font-bold">Platform Overview</h2>
+                        <p class="text-sm text-gray-500">Real-time platform statistics and management</p>
+                    </div>
+
+                    <!-- Stats -->
+                    <div class="grid grid-cols-4 gap-4 mb-8">
+                        <div class="stat-card"><div class="stat-icon blue">👥</div><div class="stat-content"><div class="stat-value">${stats.total_users || 0}</div><div class="stat-label">Total Users</div></div></div>
+                        <div class="stat-card"><div class="stat-icon green">✅</div><div class="stat-content"><div class="stat-value">${stats.active_users || 0}</div><div class="stat-label">Active Users</div></div></div>
+                        <div class="stat-card"><div class="stat-icon purple">📚</div><div class="stat-content"><div class="stat-value">${stats.total_resources || 0}</div><div class="stat-label">Resources</div></div></div>
+                        <div class="stat-card"><div class="stat-icon yellow">💻</div><div class="stat-content"><div class="stat-value">${stats.total_questions || 0}</div><div class="stat-label">Coding Problems</div></div></div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-6">
+                        <!-- Recent Users -->
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">Recent Registrations</h3>
+                                <a href="/pages/admin/users.html" class="btn btn-ghost btn-sm">View All</a>
+                            </div>
+                            <div id="recentUsers">
+                                ${(stats.recent_users || []).slice(0, 5).map(u => `
+                                    <div class="flex items-center gap-3 py-2 border-b" style="border-color:var(--gray-100)">
+                                        <div class="avatar avatar-sm">${Utils.getInitials(u.full_name)}</div>
+                                        <div class="flex-1">
+                                            <p class="text-sm font-medium">${Utils.escapeHtml(u.full_name)}</p>
+                                            <p class="text-xs text-gray-500">${Utils.escapeHtml(u.email)}</p>
+                                        </div>
+                                        <span class="badge badge-${u.is_active ? 'success' : 'gray'}">${u.is_active ? 'Active' : 'Inactive'}</span>
+                                    </div>
+                                `).join('') || '<p class="text-sm text-gray-500">No recent registrations</p>'}
+                            </div>
+                        </div>
+
+                        <!-- System Health -->
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">Quick Actions</h3>
+                            </div>
+                            <div class="flex flex-col gap-3">
+                                <a href="/pages/admin/users.html" class="btn btn-secondary w-full">👥 Manage Users</a>
+                                <a href="/pages/admin/resources.html" class="btn btn-secondary w-full">📚 Manage Resources</a>
+                                <a href="/pages/admin/coding.html" class="btn btn-secondary w-full">💻 Manage Coding</a>
+                                <a href="/pages/admin/notifications.html" class="btn btn-secondary w-full">🔔 Send Notification</a>
+                                <a href="/pages/admin/audit.html" class="btn btn-secondary w-full">🔒 Audit Logs</a>
+                                <a href="/pages/admin/analytics.html" class="btn btn-secondary w-full">📈 Analytics</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+            } catch (e) {
+                content.innerHTML = `<p class="text-danger">Failed to load dashboard: ${e.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>

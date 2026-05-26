@@ -49,6 +49,13 @@ from apps.notifications.views import (
     AdminAlertStatsView,
     AdminSendTargetedNotificationView,
 )
+from apps.roadmaps.views import AdminRoadmapListCreateView, AdminRoadmapDetailView, AdminMilestoneCreateView, AdminStepCreateView
+from apps.resume.views import AdminResumeTemplateListCreateView, AdminResumeTemplateDetailView
+from apps.lost_found.views import AdminLostFoundListView, AdminLostFoundRemoveView
+from apps.assignments.views import (
+    AdminAssignmentCreateView, AdminAssignmentDetailView,
+    AdminAssignmentSubmissionsView, AdminAssignmentGradeView,
+)
 
 urlpatterns = [
     # Dashboard
@@ -118,4 +125,24 @@ urlpatterns = [
 
     # Targeted notifications
     path("notifications/send",                     AdminSendTargetedNotificationView.as_view(), name="admin-notifications-send"),
+
+    # Roadmaps management
+    path("roadmaps",                               AdminRoadmapListCreateView.as_view(),       name="admin-roadmaps"),
+    path("roadmaps/<uuid:pk>",                     AdminRoadmapDetailView.as_view(),           name="admin-roadmap-detail"),
+    path("roadmaps/<uuid:roadmap_id>/milestones",  AdminMilestoneCreateView.as_view(),         name="admin-roadmap-milestone"),
+    path("roadmaps/milestones/<uuid:milestone_id>/steps", AdminStepCreateView.as_view(),       name="admin-roadmap-step"),
+
+    # Resume templates
+    path("resume/templates",                       AdminResumeTemplateListCreateView.as_view(), name="admin-resume-templates"),
+    path("resume/templates/<uuid:pk>",             AdminResumeTemplateDetailView.as_view(),    name="admin-resume-template-detail"),
+
+    # Lost & Found moderation
+    path("lost-found",                             AdminLostFoundListView.as_view(),           name="admin-lost-found"),
+    path("lost-found/<uuid:pk>",                   AdminLostFoundRemoveView.as_view(),         name="admin-lost-found-remove"),
+
+    # Assignments management
+    path("assignments",                            AdminAssignmentCreateView.as_view(),        name="admin-assignments-create"),
+    path("assignments/<uuid:pk>",                  AdminAssignmentDetailView.as_view(),        name="admin-assignment-detail"),
+    path("assignments/<uuid:pk>/submissions",      AdminAssignmentSubmissionsView.as_view(),   name="admin-assignment-submissions"),
+    path("assignments/submissions/<uuid:sub_id>/grade", AdminAssignmentGradeView.as_view(),    name="admin-assignment-grade"),
 ]

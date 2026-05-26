@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings | CampusHub</title>
+    <link rel="stylesheet" href="/assets/css/variables.css">
+    <link rel="stylesheet" href="/assets/css/base.css">
+    <link rel="stylesheet" href="/assets/css/components.css">
+    <link rel="stylesheet" href="/assets/css/utilities.css">
+    <link rel="stylesheet" href="/assets/css/layout.css">
+</head>
+<body>
+    <div class="app-layout" id="app"></div>
+    <script src="/assets/js/config.js"></script>
+    <script src="/assets/js/api.js"></script>
+    <script src="/assets/js/auth.js"></script>
+    <script src="/assets/js/utils.js"></script>
+    <script src="/assets/js/components.js"></script>
+    <script>
+        if (!Auth.requireAuth()) throw new Error('Not authenticated');
+        Components.initLayout('settings', 'Settings');
+        loadSettings();
+
+        function loadSettings() {
+            const content = document.getElementById('pageContent');
+            const user = Auth.getUser();
+
+            content.innerHTML = `
+            <div class="animate-fade-in">
+                <!-- Profile Settings -->
+                <div class="card mb-6">
+                    <h3 class="card-title mb-4">Profile Information</h3>
+                    <form onsubmit="updateProfile(event)">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="form-group"><label class="form-label">Full Name</label><input type="text" id="sName" class="form-input" value="${Utils.escapeHtml(user?.full_name || '')}"></div>
+                            <div class="form-group"><label class="form-label">Email</label><input type="email" class="form-input" value="${Utils.escapeHtml(user?.email || '')}" disabled></div>
+                            <div class="form-group"><label class="form-label">Phone</label><input type="tel" id="sPhone" class="form-input" value="${Utils.escapeHtml(user?.phone || '')}"></div>
+                            <div class="form-group"><label class="form-label">Branch</label><input type="text" id="sBranch" class="form-input" value="${Utils.escapeHtml(user?.branch || '')}"></div>
+                            <div class="form-group"><label class="form-label">Section</label><input type="text" id="sSection" class="form-input" value="${Utils.escapeHtml(user?.section || '')}"></div>
+                            <div class="form-group"><label class="form-label">Batch</label><input type="text" id="sBatch" class="form-input" value="${Utils.escapeHtml(user?.batch || '')}"></div>
+                        </div>
+                        <button type="submit" class="btn btn-primary mt-4">Save Changes</button>
+                    </form>
+                </div>
+
+                <!-- Change Password -->
+                <div class="card mb-6">
+                    <h3 class="card-title mb-4">Change Password</h3>
+                    <form onsubmit="changePassword(event)">
+                        <div class="grid grid-cols-3 gap-4">
+                            <div class="form-group"><label class="form-label">Current Password</label><input type="password" id="oldPass" class="form-input" required></div>
+                            <div class="form-group"><label class="form-label">New Password</label><input type="password" id="newPass" class="form-input" required></div>
+                            <div class="form-group"><label class="form-label">Confirm New Password</label><input type="password" id="confirmPass" class="form-input" required></div>
+                        </div>
+                        <button type="submit" class="btn btn-primary mt-4">Update Password</button>
+                    </form>
+                </div>
+
+                <!-- Notification Preferences -->
+                <div class="card mb-6">
+                    <h3 class="card-title mb-4">Notification Preferences</h3>
+                    <div class="flex flex-col gap-4">
+                        <label class="flex items-center justify-between">
+                            <span class="text-sm">Email notifications</span>
+                            <input type="checkbox" checked>
+                        </label>
+                        <label class="flex items-center justify-between">
+                            <span class="text-sm">Assignment reminders</span>
+                            <input type="checkbox" checked>
+                        </label>
+                        <label class="flex items-center justify-between">
+                            <span class="text-sm">Contest alerts</span>
+                            <input type="checkbox" checked>
+                        </label>
+                        <label class="flex items-center justify-between">
+                            <span class="text-sm">News updates</span>
+                            <input type="checkbox" checked>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Danger Zone -->
+                <div class="card" style="border-color:var(--danger-200)">
+                    <h3 class="card-title mb-4 text-danger">Danger Zone</h3>
+                    <button class="btn btn-danger" onclick="Auth.logout()">Logout from all devices</button>
+                </div>
+            </div>`;
+        }
+
+        async function updateProfile(e) {
+            e.preventDefault();
+            try {
+                await API.put('/profile', {
+                    full_name: document.getElementById('sName').value,
+                    phone: document.getElementById('sPhone').value,
+                    branch: document.getElementById('sBranch').value,
+                    section: document.getElementById('sSection').value,
+                    batch: document.getElementById('sBatch').value,
+                });
+                Toast.success('Profile updated!');
+                await Auth.fetchCurrentUser();
+            } catch (e) { Toast.error(e.message); }
+        }
+
+        async function changePassword(e) {
+            e.preventDefault();
+            const newPass = document.getElementById('newPass').value;
+            const confirmPass = document.getElementById('confirmPass').value;
+            if (newPass !== confirmPass) { Toast.error('Passwords do not match'); return; }
+
+            try {
+                await Auth.changePassword(
+                    document.getElementById('oldPass').value,
+                    newPass,
+                    confirmPass
+                );
+                Toast.success('Password changed! Please log in again.');
+                setTimeout(() => Auth.logout(), 2000);
+            } catch (e) { Toast.error(e.message); }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Management | CampusHub Admin</title>
+    <link rel="stylesheet" href="/assets/css/variables.css">
+    <link rel="stylesheet" href="/assets/css/base.css">
+    <link rel="stylesheet" href="/assets/css/components.css">
+    <link rel="stylesheet" href="/assets/css/utilities.css">
+    <link rel="stylesheet" href="/assets/css/layout.css">
+</head>
+<body>
+    <div class="app-layout" id="app"></div>
+    <script src="/assets/js/config.js"></script>
+    <script src="/assets/js/api.js"></script>
+    <script src="/assets/js/auth.js"></script>
+    <script src="/assets/js/utils.js"></script>
+    <script src="/assets/js/components.js"></script>
+    <script>
+        if (!Auth.requireAdmin()) throw new Error('Not admin');
+        Components.initLayout('users', 'User Management');
+
+        let currentPage = 1;
+        let searchQuery = '';
+
+        loadUsers();
+
+        async function loadUsers() {
+            const content = document.getElementById('pageContent');
+            content.innerHTML = `
+            <div class="animate-fade-in">
+                <div class="flex items-center justify-between mb-6">
+                    <div class="search-bar"><span class="search-icon">🔍</span><input type="text" placeholder="Search users..." oninput="debouncedSearch(this.value)"></div>
+                    <div class="flex gap-2">
+                        <button class="btn btn-secondary btn-sm" onclick="exportUsers()">📥 Export</button>
+                        <button class="btn btn-primary btn-sm" onclick="showCreateModal()">+ Add User</button>
+                    </div>
+                </div>
+                <div class="card">
+                    <div id="usersTable">${Components.renderSkeleton('table')}</div>
+                    <div id="pagination"></div>
+                </div>
+            </div>
+
+            <!-- Create User Modal -->
+            <div class="modal-overlay" id="createModal" onclick="if(event.target===this)Components.closeModal('createModal')">
+                <div class="modal">
+                    <div class="modal-header"><h3 class="modal-title">Create Faculty Account</h3><button class="modal-close" onclick="Components.closeModal('createModal')">✕</button></div>
+                    <div class="modal-body">
+                        <form onsubmit="createFaculty(event)">
+                            <div class="form-group"><label class="form-label">Full Name</label><input type="text" id="cName" class="form-input" required></div>
+                            <div class="form-group"><label class="form-label">Email</label><input type="email" id="cEmail" class="form-input" required></div>
+                            <div class="form-group"><label class="form-label">Password</label><input type="password" id="cPass" class="form-input" required></div>
+                            <div class="form-group"><label class="form-label">Branch</label><input type="text" id="cBranch" class="form-input"></div>
+                            <button type="submit" class="btn btn-primary w-full">Create Account</button>
+                        </form>
+                    </div>
+                </div>
+            </div>`;
+
+            fetchUsers();
+        }
+
+        async function fetchUsers() {
+            const el = document.getElementById('usersTable');
+            try {
+                const params = { page: currentPage, page_size: 20 };
+                if (searchQuery) params.search = searchQuery;
+                const data = await API.get('/admin/students', params);
+                const users = data?.data?.results || data?.data || [];
+                const total = data?.data?.count || users.length;
+
+                el.innerHTML = `
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead><tr><th>Name</th><th>Email</th><th>Student ID</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
+                        <tbody>
+                            ${users.map(u => `
+                                <tr>
+                                    <td class="font-medium">${Utils.escapeHtml(u.full_name)}</td>
+                                    <td class="text-gray-500">${Utils.escapeHtml(u.email)}</td>
+                                    <td>${Utils.escapeHtml(u.student_id || '—')}</td>
+                                    <td><span class="badge badge-${u.role === 'admin' ? 'purple' : u.role === 'faculty' ? 'info' : 'gray'}">${u.role}</span></td>
+                                    <td><span class="badge badge-${u.is_active ? 'success' : 'danger'}">${u.is_active ? 'Active' : 'Inactive'}</span></td>
+                                    <td>
+                                        <div class="flex gap-1">
+                                            ${u.is_active ? `<button class="btn btn-ghost btn-sm" onclick="deactivateUser('${u.id}')">Deactivate</button>` : `<button class="btn btn-ghost btn-sm" onclick="activateUser('${u.id}')">Activate</button>`}
+                                            ${u.is_locked ? `<button class="btn btn-ghost btn-sm" onclick="unlockUser('${u.id}')">Unlock</button>` : ''}
+                                        </div>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>`;
+
+                document.getElementById('pagination').innerHTML = Components.renderPagination(currentPage, Math.ceil(total / 20), 'goToPage');
+            } catch (e) { el.innerHTML = `<p class="text-danger">${e.message}</p>`; }
+        }
+
+        function goToPage(p) { currentPage = p; fetchUsers(); }
+        const debouncedSearch = Utils.debounce((v) => { searchQuery = v; currentPage = 1; fetchUsers(); }, 400);
+        function showCreateModal() { Components.openModal('createModal'); }
+
+        async function createFaculty(e) {
+            e.preventDefault();
+            try {
+                await API.post('/auth/create-faculty', {
+                    full_name: document.getElementById('cName').value,
+                    email: document.getElementById('cEmail').value,
+                    password: document.getElementById('cPass').value,
+                    branch: document.getElementById('cBranch').value,
+                });
+                Toast.success('Faculty account created!');
+                Components.closeModal('createModal');
+                fetchUsers();
+            } catch (e) { Toast.error(e.message); }
+        }
+
+        async function deactivateUser(id) { Components.confirm('Deactivate this user?', async () => { try { await API.post(`/admin/students/${id}/deactivate`); Toast.success('User deactivated'); fetchUsers(); } catch(e) { Toast.error(e.message); } }); }
+        async function activateUser(id) { try { await API.post(`/admin/students/${id}/activate`); Toast.success('User activated'); fetchUsers(); } catch(e) { Toast.error(e.message); } }
+        async function unlockUser(id) { try { await API.post(`/auth/unlock/${id}`); Toast.success('Account unlocked'); fetchUsers(); } catch(e) { Toast.error(e.message); } }
+        async function exportUsers() { window.open(`${Config.API_BASE_URL}/admin/students/export`, '_blank'); }
+    </script>
+</body>
+</html>

@@ -368,10 +368,14 @@ class AdminStudentRoleUpdateView(APIView):
         except User.DoesNotExist:
             return err("Student not found.", 404)
         role = request.data.get("role", "").strip()
-        if role not in {"student", "admin"}:
-            return err("role must be 'student' or 'admin'.")
+        valid_roles = {"student", "admin", "faculty", "moderator"}
+        # Only super_admin can assign admin role
+        if role == "admin" and request.user.role != "super_admin":
+            return err("Only super admins can assign admin role.")
+        if role not in valid_roles:
+            return err(f"role must be one of: {', '.join(sorted(valid_roles))}.")
         user.role = role
-        user.is_staff = role == "admin"
+        user.is_staff = role in ("admin", "super_admin", "faculty")
         user.save(update_fields=["role", "is_staff", "updated_at"])
         try:
             from apps.audit.utils import log_action

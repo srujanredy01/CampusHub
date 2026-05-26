@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resource Detail | CampusHub</title>
+    <link rel="stylesheet" href="/assets/css/variables.css">
+    <link rel="stylesheet" href="/assets/css/base.css">
+    <link rel="stylesheet" href="/assets/css/components.css">
+    <link rel="stylesheet" href="/assets/css/utilities.css">
+    <link rel="stylesheet" href="/assets/css/layout.css">
+</head>
+<body>
+    <div class="app-layout" id="app"></div>
+    <script src="/assets/js/config.js"></script>
+    <script src="/assets/js/api.js"></script>
+    <script src="/assets/js/auth.js"></script>
+    <script src="/assets/js/utils.js"></script>
+    <script src="/assets/js/components.js"></script>
+    <script>
+        if (!Auth.requireAuth()) throw new Error('Not authenticated');
+        Components.initLayout('resources', 'Resource Detail');
+
+        const params = Utils.getQueryParams();
+        loadResourceDetail(params.id);
+
+        async function loadResourceDetail(id) {
+            const content = document.getElementById('pageContent');
+            if (!id) { content.innerHTML = '<p class="text-danger">No resource ID</p>'; return; }
+
+            try {
+                const data = await API.get(`/resources/${id}`);
+                const r = data?.data || data;
+                Utils.setPageTitle(r.title);
+
+                content.innerHTML = `
+                <div class="animate-fade-in">
+                    <a href="/pages/student/resources.html" class="btn btn-ghost btn-sm mb-4">← Back to Resources</a>
+                    <div class="card">
+                        <div class="flex items-start justify-between mb-4">
+                            <div>
+                                <h2 class="text-xl font-bold">${Utils.escapeHtml(r.title)}</h2>
+                                <p class="text-sm text-gray-500 mt-1">${Utils.escapeHtml(r.subject || '')} • Uploaded ${Utils.timeAgo(r.created_at)}</p>
+                            </div>
+                            <div class="flex gap-2">
+                                <a href="${Config.API_BASE_URL}/resources/${id}/download" class="btn btn-primary btn-sm" target="_blank">⬇ Download</a>
+                                <a href="${Config.API_BASE_URL}/resources/${id}/preview" class="btn btn-secondary btn-sm" target="_blank">👁 Preview</a>
+                            </div>
+                        </div>
+                        <div class="flex gap-3 mb-4">
+                            <span class="badge badge-gray">${Utils.escapeHtml(r.file_type || 'PDF')}</span>
+                            <span class="badge badge-info">${Utils.formatFileSize(r.file_size)}</span>
+                            <span class="badge badge-gray">⬇ ${r.download_count || 0} downloads</span>
+                        </div>
+                        ${r.description ? `<p class="text-sm text-gray-700 mt-4">${Utils.escapeHtml(r.description)}</p>` : ''}
+                    </div>
+                </div>`;
+            } catch (e) {
+                content.innerHTML = `<p class="text-danger">Failed to load resource: ${e.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>

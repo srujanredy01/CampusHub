@@ -1,7 +1,7 @@
 #!/bin/sh
 # ─────────────────────────────────────────────────────────────────────────────
 #  CampusHub Backend — Production Entrypoint
-#  Runs all commands directly (container runs as root, gunicorn drops to appuser)
+#  Runs migrations, collects static, creates admin, starts Daphne (ASGI)
 # ─────────────────────────────────────────────────────────────────────────────
 set -e
 
@@ -31,31 +31,21 @@ echo "  Database is ready."
 echo "[1/4] Running migrations..."
 python manage.py migrate --noinput
 
-# Create cache table (ignore if exists)
-echo "[2/4] Creating cache table..."
-python manage.py createcachetable 2>/dev/null || true
-
 # Collect static files
-echo "[3/4] Collecting static files..."
+echo "[2/4] Collecting static files..."
 python manage.py collectstatic --noinput --clear
 
 # Create admin account
-echo "[4/4] Creating admin account..."
+echo "[3/4] Creating admin account..."
 python manage.py create_admin --noinput 2>/dev/null || true
 
-echo "=== Starting Gunicorn ==="
+echo "[4/4] Starting application server..."
 
-# Start gunicorn (exec replaces shell for proper signal handling)
-exec gunicorn campushub.wsgi:application \
-    --bind 0.0.0.0:8000 \
-    --workers 3 \
-    --worker-class sync \
-    --timeout 120 \
-    --keep-alive 5 \
-    --max-requests 1000 \
-    --max-requests-jitter 100 \
-    --access-logfile - \
-    --error-logfile - \
-    --log-level warning \
-    --user appuser \
-    --group appgroup
+# Start Daphne (ASGI) for HTTP + WebSocket support
+# Using daphne instead of gunicorn to support WebSocket connections
+exec daphne campushub.asgi:application \
+    --bind 0.0.0.0 \
+    --port 8000 \
+    --verbosity 1 \
+    --access-log - \
+    --proxy-headers

@@ -10,9 +10,11 @@ from rest_framework.throttling import AnonRateThrottle
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
+from campushub.permissions import IsSuperAdmin, IsAdmin, IsFacultyOrAdmin
 from .serializers import (
-    UserSignupSerializer, ForgotPasswordSerializer,
-    ResetPasswordSerializer, ChangePasswordSerializer, UserSerializer,
+    UserSignupSerializer, FacultySignupSerializer, AdminUserCreateSerializer,
+    ForgotPasswordSerializer, ResetPasswordSerializer,
+    ChangePasswordSerializer, UserSerializer,
 )
 
 User = get_user_model()
@@ -51,17 +53,14 @@ class SignupView(APIView):
             return Response({"success": False, "errors": s.errors}, status=400)
 
         user = s.save()
-        # Generate email verification token — user is NOT active until verified
         token = secrets.token_urlsafe(32)
         user.email_verification_token = token
         user.email_verification_sent_at = timezone.now()
-        # Account is active immediately upon signup
         user.is_active = True
         user.save(update_fields=[
             "email_verification_token", "email_verification_sent_at", "is_active",
         ])
 
-        # Track signup
         try:
             from apps.audit.utils import log_signup
             log_signup(request, user)
@@ -105,30 +104,48 @@ class LoginView(APIView):
 
     def post(self, request):
         student_id = request.data.get("student_id", "").strip()
-        password   = request.data.get("password", "")
+        password = request.data.get("password", "")
 
         if not student_id or not password:
             return err("Student ID and password are required.")
 
-        # Look up user
+        # Look up user by student_id or email (for faculty/admin login)
+        user = None
         try:
             user = User.objects.get(student_id=student_id)
         except User.DoesNotExist:
             try:
-                from apps.audit.utils import log_login_failed
-                log_login_failed(request, student_id)
-            except Exception:
+                user = User.objects.get(email=student_id.lower())
+            except User.DoesNotExist:
                 pass
-            logger.warning("Login failed — student_id not found: %s", student_id)
-            return err("Invalid credentials.", 401)
 
-        # Check password
-        if not user.check_password(password):
+        if not user:
             try:
                 from apps.audit.utils import log_login_failed
                 log_login_failed(request, student_id)
             except Exception:
                 pass
+            logger.warning("Login failed — user not found: %s", student_id)
+            return err("Invalid credentials.", 401)
+
+        # Check if account is locked
+        if user.is_locked:
+            if user.locked_at and timezone.now() < user.locked_at + timedelta(minutes=30):
+                return err("Account is locked due to too many failed attempts. Try again in 30 minutes.", 403)
+            else:
+                user.unlock_account()
+
+        # Check password
+        if not user.check_password(password):
+            user.increment_failed_login()
+            try:
+                from apps.audit.utils import log_login_failed
+                log_login_failed(request, student_id)
+            except Exception:
+                pass
+            remaining = 5 - user.failed_login_attempts
+            if user.is_locked:
+                return err("Account locked due to too many failed attempts. Try again in 30 minutes.", 403)
             logger.warning("Login failed — wrong password for: %s", student_id)
             return err("Invalid credentials.", 401)
 
@@ -136,28 +153,30 @@ class LoginView(APIView):
         if not user.is_active:
             return err("Your account has been deactivated. Please contact support.", 403)
 
-        # Issue tokens
+        # Reset failed attempts on successful login
+        user.reset_failed_login()
+
+        # Issue tokens with role claims
         refresh = RefreshToken.for_user(user)
         refresh["full_name"] = user.full_name
-        refresh["email"]     = user.email
-        refresh["role"]      = user.role
+        refresh["email"] = user.email
+        refresh["role"] = user.role
 
         user.last_login = timezone.now()
         user.save(update_fields=["last_login"])
 
-        # Track successful login
         try:
             from apps.audit.utils import log_login_success
             log_login_success(request, user)
         except Exception:
             pass
 
-        logger.info("Login success: %s (role=%s)", user.student_id, user.role)
+        logger.info("Login success: %s (role=%s)", user.student_id or user.email, user.role)
         return ok(
             {
-                "access":  str(refresh.access_token),
+                "access": str(refresh.access_token),
                 "refresh": str(refresh),
-                "user":    UserSerializer(user).data,
+                "user": UserSerializer(user).data,
             },
             "Login successful.",
         )
@@ -173,17 +192,15 @@ class LogoutView(APIView):
         try:
             RefreshToken(refresh_token).blacklist()
         except TokenError as e:
-            # Token already blacklisted or invalid — still consider logout successful
             logger.info("Logout token error (non-critical): %s", e)
 
-        # Track logout if user is authenticated
         if hasattr(request, "user") and request.user.is_authenticated:
             try:
                 from apps.audit.utils import log_logout
                 log_logout(request, request.user)
             except Exception:
                 pass
-            logger.info("Logout: %s", request.user.student_id)
+            logger.info("Logout: %s", request.user.student_id or request.user.email)
 
         return ok(message="Logged out successfully.")
 
@@ -233,9 +250,10 @@ class ResetPasswordView(APIView):
         user.set_password(s.validated_data["password"])
         user.password_reset_token = None
         user.password_reset_sent_at = None
-        user.save(update_fields=["password", "password_reset_token", "password_reset_sent_at"])
+        user.is_locked = False
+        user.failed_login_attempts = 0
+        user.save(update_fields=["password", "password_reset_token", "password_reset_sent_at", "is_locked", "failed_login_attempts"])
 
-        # Blacklist all outstanding refresh tokens for this user (security measure)
         try:
             from rest_framework_simplejwt.token_blacklist.models import OutstandingToken, BlacklistedToken
             tokens = OutstandingToken.objects.filter(user=user)
@@ -264,7 +282,6 @@ class ChangePasswordView(APIView):
         request.user.set_password(s.validated_data["new_password"])
         request.user.save(update_fields=["password"])
 
-        # Blacklist all outstanding refresh tokens for this user (security measure)
         try:
             from rest_framework_simplejwt.token_blacklist.models import OutstandingToken, BlacklistedToken
             tokens = OutstandingToken.objects.filter(user=request.user)
@@ -313,3 +330,55 @@ class MeView(APIView):
 
     def get(self, request):
         return ok(UserSerializer(request.user).data)
+
+
+class CreateFacultyView(APIView):
+    """Admin creates faculty accounts."""
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    def post(self, request):
+        s = FacultySignupSerializer(data=request.data)
+        if not s.is_valid():
+            return Response({"success": False, "errors": s.errors}, status=400)
+        user = s.save()
+        try:
+            from apps.audit.utils import log_activity
+            log_activity(request, "faculty_created", metadata={"email": user.email})
+        except Exception:
+            pass
+        return ok(UserSerializer(user).data, "Faculty account created.", 201)
+
+
+class CreateAdminUserView(APIView):
+    """Super admin creates admin/moderator accounts."""
+    permission_classes = [IsAuthenticated, IsSuperAdmin]
+
+    def post(self, request):
+        s = AdminUserCreateSerializer(data=request.data)
+        if not s.is_valid():
+            return Response({"success": False, "errors": s.errors}, status=400)
+        user = s.save()
+        try:
+            from apps.audit.utils import log_activity
+            log_activity(request, "admin_user_created", metadata={"email": user.email, "role": user.role})
+        except Exception:
+            pass
+        return ok(UserSerializer(user).data, f"{user.role.title()} account created.", 201)
+
+
+class UnlockAccountView(APIView):
+    """Admin unlocks a locked user account."""
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    def post(self, request, user_id):
+        try:
+            user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return err("User not found.", 404)
+        user.unlock_account()
+        try:
+            from apps.audit.utils import log_activity
+            log_activity(request, "account_unlocked", metadata={"target_user": str(user.id)})
+        except Exception:
+            pass
+        return ok(message=f"Account for {user.email} has been unlocked.")

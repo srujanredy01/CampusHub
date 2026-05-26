@@ -1,112 +1,102 @@
 # CampusHub — AWS EC2 Production Deployment Guide
 
-## Prerequisites
-- AWS EC2 instance (Ubuntu 22.04 recommended, t3.medium or larger)
-- Docker & Docker Compose installed
-- Git installed
-- Security group: ports 80 (HTTP), 22 (SSH) open
+## Architecture
 
-## Quick Deploy (5 minutes)
+```
+Internet → :80 Nginx ─┬─ /api/*        → Django Backend (Gunicorn :8000)
+                      ├─ /ws/*         → Django Channels (WebSocket)
+                      ├─ /static/*     → Volume (collectstatic)
+                      ├─ /media/*      → Volume (uploads / S3)
+                      ├─ /django-admin → Django Admin
+                      └─ /*            → React Frontend (Nginx :3000)
+
+Backend → PostgreSQL (db:5432)
+       → Redis (redis:6379) — Cache + Channel Layer + Celery Broker
+       → Celery Worker — Async tasks (emails, stats)
+       → Executor Service (executor:8001) — Code sandbox
+       → AWS S3 (optional) — File storage
+```
+
+## Services (8 containers)
+
+| Service      | Container              | Port | Description                    |
+|-------------|------------------------|------|--------------------------------|
+| nginx       | campushub_nginx        | 80   | Reverse proxy + SSL termination|
+| backend     | campushub_backend      | 8000 | Django REST API + Gunicorn     |
+| frontend    | campushub_frontend     | 3000 | React (Vite build) + Nginx     |
+| db          | campushub_db           | 5432 | PostgreSQL 15                  |
+| redis       | campushub_redis        | 6379 | Cache + Celery broker          |
+| celery      | campushub_celery       | —    | Async task worker              |
+| celery-beat | campushub_celery_beat  | —    | Periodic task scheduler        |
+| executor    | campushub_executor     | 8001 | Code execution sandbox         |
+
+## Quick Deploy
 
 ```bash
-# 1. Clone the repository
-cd /opt
-sudo git clone https://github.com/YOUR_REPO/CampusHub.git campushub
-cd campushub
+# 1. SSH into EC2
+ssh -i your-key.pem ubuntu@YOUR_EC2_IP
 
-# 2. Configure environment
+# 2. Run setup script (first time only)
+sudo bash /opt/campushub/scripts/ec2-setup.sh
+
+# 3. Clone repo
+cd /opt/campushub
+git clone https://github.com/YOUR_USER/CampusHub.git .
+
+# 4. Configure environment
 cp backend/.env.production backend/.env
-nano backend/.env
-# Fill in: SECRET_KEY, ADMIN_PASSWORD, your EC2 IP in ALLOWED_HOSTS,
-# CORS_ALLOWED_ORIGINS, CSRF_TRUSTED_ORIGINS
+nano backend/.env  # Fill in real values
 
-# 3. Deploy
+# 5. Deploy
 docker compose -f docker-compose.prod.yml up -d --build
 
-# 4. Verify
+# 6. Verify
 docker compose -f docker-compose.prod.yml ps
 curl http://localhost/api/health/
 ```
 
-## Environment Configuration
-
-Edit `backend/.env` with your production values:
+## Required .env Values
 
 ```env
-SECRET_KEY=<generate with: python -c "import secrets; print(secrets.token_hex(50))">
+SECRET_KEY=<python -c "import secrets; print(secrets.token_hex(50))">
 DEBUG=False
-ALLOWED_HOSTS=YOUR_EC2_IP,YOUR_DOMAIN.com,backend,localhost
-
-CORS_ALLOWED_ORIGINS=http://YOUR_EC2_IP,https://YOUR_DOMAIN.com
-CSRF_TRUSTED_ORIGINS=http://YOUR_EC2_IP,https://YOUR_DOMAIN.com
+ALLOWED_HOSTS=YOUR_EC2_IP,your-domain.com,backend,localhost
+DB_PASSWORD=<strong password>
+CORS_ALLOWED_ORIGINS=http://YOUR_EC2_IP
+CSRF_TRUSTED_ORIGINS=http://YOUR_EC2_IP
+FRONTEND_URL=http://YOUR_EC2_IP
 ADMIN_PASSWORD=<strong password>
+REDIS_URL=redis://redis:6379/0
+CELERY_BROKER_URL=redis://redis:6379/2
 ```
-
-## Architecture
-
-```
-Internet → :80 Nginx → /api/*        → Django (backend:8000)
-                      → /static/*     → Volume (collectstatic)
-                      → /media/*      → Volume (uploads)
-                      → /django-admin → Django admin
-                      → /*            → Frontend (static HTML/CSS/JS on :3000)
-```
-
-## Services
-
-| Service    | Container              | Port | Description                    |
-|-----------|------------------------|------|--------------------------------|
-| nginx     | campushub_nginx        | 80   | Reverse proxy                  |
-| backend   | campushub_backend      | 8000 | Django REST API                |
-| frontend  | campushub_frontend     | 3000 | Static HTML/CSS/JS             |
-| db        | campushub_db           | 5432 | PostgreSQL 15                  |
-| executor  | campushub_executor     | 8001 | Code execution sandbox         |
 
 ## Working URLs
 
-- `http://EC2_IP/` — Frontend (login page)
+- `http://EC2_IP/` — React frontend
+- `http://EC2_IP/login` — Login page
 - `http://EC2_IP/api/health/` — Health check
-- `http://EC2_IP/api/docs/` — API documentation (Swagger)
-- `http://EC2_IP/django-admin/` — Django admin panel
-- `http://EC2_IP/admin/` — Redirects to Django admin
+- `http://EC2_IP/api/docs/` — Swagger API docs
+- `http://EC2_IP/django-admin/` — Django admin
+- `http://EC2_IP/admin/` → redirects to Django admin
 
-## Default Admin Credentials
+## Default Admin
 
 - Student ID: `0000000`
-- Password: Value of `ADMIN_PASSWORD` in .env (default: `Admin@123`)
+- Password: value of `ADMIN_PASSWORD` in .env
 
 ## Monitoring (Optional)
 
 ```bash
 docker compose -f docker-compose.prod.yml -f docker-compose.monitoring.yml up -d --build
-# Grafana: ssh -L 3001:localhost:3001 user@EC2_IP
-# Then open http://localhost:3001
+# Grafana: ssh -L 3001:localhost:3001 ubuntu@EC2_IP → http://localhost:3001
 ```
 
 ## Troubleshooting
 
 ```bash
-# View logs
 docker logs campushub_backend --tail=50
-docker logs campushub_nginx --tail=50
-
-# Restart a service
-docker compose -f docker-compose.prod.yml restart backend
-
-# Run migrations manually
-docker exec campushub_backend python manage.py migrate
-
-# Create superuser manually
-docker exec -it campushub_backend python manage.py createsuperuser
-
-# Check database connectivity
-docker exec campushub_backend python manage.py check --database default
+docker logs campushub_frontend --tail=20
+docker logs campushub_celery --tail=20
+docker exec campushub_backend python manage.py check
+docker exec campushub_backend python manage.py migrate --check
 ```
-
-## SSL/HTTPS Setup
-
-1. Install certbot on EC2
-2. Obtain certificate for your domain
-3. Uncomment HTTPS block in `docker/nginx/nginx.prod.conf`
-4. Mount certificates as volumes in docker-compose
-5. Uncomment `SECURE_PROXY_SSL_HEADER` in settings.py

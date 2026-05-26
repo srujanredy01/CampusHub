@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notifications | CampusHub</title>
+    <link rel="stylesheet" href="/assets/css/variables.css">
+    <link rel="stylesheet" href="/assets/css/base.css">
+    <link rel="stylesheet" href="/assets/css/components.css">
+    <link rel="stylesheet" href="/assets/css/utilities.css">
+    <link rel="stylesheet" href="/assets/css/layout.css">
+</head>
+<body>
+    <div class="app-layout" id="app"></div>
+    <script src="/assets/js/config.js"></script>
+    <script src="/assets/js/api.js"></script>
+    <script src="/assets/js/auth.js"></script>
+    <script src="/assets/js/utils.js"></script>
+    <script src="/assets/js/components.js"></script>
+    <script>
+        if (!Auth.requireAuth()) throw new Error('Not authenticated');
+        Components.initLayout('notifications', 'Notifications');
+        loadNotifications();
+
+        async function loadNotifications() {
+            const content = document.getElementById('pageContent');
+            content.innerHTML = `
+            <div class="animate-fade-in">
+                <div class="flex items-center justify-between mb-6">
+                    <p class="text-sm text-gray-500" id="notifCount"></p>
+                    <button class="btn btn-secondary btn-sm" onclick="markAllRead()">Mark all as read</button>
+                </div>
+                <div id="notifList">${Components.renderSkeleton('text', 5)}</div>
+            </div>`;
+
+            try {
+                const data = await API.get('/notifications');
+                const notifs = data?.data?.results || data?.data || [];
+                const el = document.getElementById('notifList');
+                document.getElementById('notifCount').textContent = `${notifs.length} notifications`;
+
+                if (notifs.length === 0) {
+                    el.innerHTML = Components.renderEmptyState('🔔', 'No notifications', 'You\'re all caught up!');
+                    return;
+                }
+
+                el.innerHTML = notifs.map(n => `
+                    <div class="card mb-3 ${!n.is_read ? 'border-l-4' : ''}" style="${!n.is_read ? 'border-left-color:var(--primary-500)' : ''}">
+                        <div class="flex items-start gap-3">
+                            <span class="text-lg">${n.type === 'assignment' ? '📝' : n.type === 'coding' ? '💻' : n.type === 'news' ? '📰' : '🔔'}</span>
+                            <div class="flex-1">
+                                <p class="text-sm ${!n.is_read ? 'font-semibold' : ''} text-gray-800">${Utils.escapeHtml(n.title || n.message || '')}</p>
+                                ${n.message && n.title ? `<p class="text-xs text-gray-500 mt-1">${Utils.escapeHtml(n.message)}</p>` : ''}
+                                <p class="text-xs text-gray-400 mt-1">${Utils.timeAgo(n.created_at)}</p>
+                            </div>
+                            <button class="btn-icon btn-ghost" onclick="deleteNotif('${n.id}', this)" aria-label="Delete">🗑️</button>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (e) {
+                document.getElementById('notifList').innerHTML = `<p class="text-danger">${e.message}</p>`;
+            }
+        }
+
+        async function markAllRead() {
+            try {
+                await API.post('/notifications/mark-read');
+                Toast.success('All marked as read');
+                loadNotifications();
+            } catch (e) { Toast.error(e.message); }
+        }
+
+        async function deleteNotif(id, btn) {
+            try {
+                await API.delete(`/notifications/${id}`);
+                btn.closest('.card').remove();
+            } catch (e) { Toast.error(e.message); }
+        }
+    </script>
+</body>
+</html>

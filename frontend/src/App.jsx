@@ -30,6 +30,16 @@ import GroupDetailPage    from "./pages/GroupDetailPage";
 import PlacementPage      from "./pages/PlacementPage";
 import AttendancePage     from "./pages/AttendancePage";
 
+// ── New modules — Part 3 ─────────────────────────────────────────────────────
+import RoadmapsPage       from "./pages/RoadmapsPage";
+import RoadmapDetailPage  from "./pages/RoadmapDetailPage";
+import ResumePage         from "./pages/ResumePage";
+import LostFoundPage      from "./pages/LostFoundPage";
+import AssignmentsPage    from "./pages/AssignmentsPage";
+import LeaderboardPage    from "./pages/LeaderboardPage";
+import ContestsPage       from "./pages/ContestsPage";
+import ContestDetailPage  from "./pages/ContestDetailPage";
+
 // ── Admin pages ───────────────────────────────────────────────────────────────
 import AdminDashboardPage       from "./pages/AdminDashboardPage";
 import AdminResourcesPage       from "./pages/AdminResourcesPage";
@@ -110,6 +120,26 @@ function App() {
 
           {/* Attendance */}
           <Route path="/attendance"        element={<AttendancePage />} />
+
+          {/* Roadmaps */}
+          <Route path="/roadmaps"          element={<RoadmapsPage />} />
+          <Route path="/roadmaps/:slug"    element={<RoadmapDetailPage />} />
+
+          {/* Resume Builder */}
+          <Route path="/resume"            element={<ResumePage />} />
+
+          {/* Lost & Found */}
+          <Route path="/lost-found"        element={<LostFoundPage />} />
+
+          {/* Assignments */}
+          <Route path="/assignments"       element={<AssignmentsPage />} />
+
+          {/* Leaderboard */}
+          <Route path="/leaderboard"       element={<LeaderboardPage />} />
+
+          {/* Contests */}
+          <Route path="/contests"          element={<ContestsPage />} />
+          <Route path="/contests/:id"      element={<ContestDetailPage />} />
         </Route>
       </Route>
 

@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Coding Hub | CampusHub</title>
+    <link rel="stylesheet" href="/assets/css/variables.css">
+    <link rel="stylesheet" href="/assets/css/base.css">
+    <link rel="stylesheet" href="/assets/css/components.css">
+    <link rel="stylesheet" href="/assets/css/utilities.css">
+    <link rel="stylesheet" href="/assets/css/layout.css">
+    <style>
+        .problem-card { padding: var(--space-4); border: 1px solid var(--gray-100); border-radius: var(--radius-lg); transition: all var(--transition-fast); cursor: pointer; }
+        .problem-card:hover { border-color: var(--primary-200); background: var(--primary-50); transform: translateY(-1px); }
+        .difficulty-easy { color: var(--success-600); }
+        .difficulty-medium { color: var(--warning-600); }
+        .difficulty-hard { color: var(--danger-600); }
+    </style>
+</head>
+<body>
+    <div class="app-layout" id="app"></div>
+
+    <script src="/assets/js/config.js"></script>
+    <script src="/assets/js/api.js"></script>
+    <script src="/assets/js/auth.js"></script>
+    <script src="/assets/js/utils.js"></script>
+    <script src="/assets/js/components.js"></script>
+    <script>
+        if (!Auth.requireAuth()) throw new Error('Not authenticated');
+        Components.initLayout('coding', 'Coding Hub');
+
+        let currentPage = 1;
+        let currentFilters = { difficulty: '', topic: '', search: '' };
+
+        loadCodingHub();
+
+        async function loadCodingHub() {
+            const content = document.getElementById('pageContent');
+            content.innerHTML = `
+            <div class="animate-fade-in">
+                <!-- Stats -->
+                <div class="grid grid-cols-4 gap-4 mb-6" id="codingStats">
+                    ${Components.renderSkeleton('card', 4)}
+                </div>
+
+                <!-- Filters -->
+                <div class="card mb-6">
+                    <div class="flex items-center gap-4 flex-wrap">
+                        <div class="search-bar" style="max-width:300px">
+                            <span class="search-icon">🔍</span>
+                            <input type="text" placeholder="Search problems..." id="searchInput" 
+                                   oninput="debouncedSearch(this.value)">
+                        </div>
+                        <select class="form-input" style="width:auto" id="difficultyFilter" onchange="applyFilters()">
+                            <option value="">All Difficulties</option>
+                            <option value="easy">Easy</option>
+                            <option value="medium">Medium</option>
+                            <option value="hard">Hard</option>
+                        </select>
+                        <select class="form-input" style="width:auto" id="languageFilter" onchange="applyFilters()">
+                            <option value="">All Languages</option>
+                            <option value="python">Python</option>
+                            <option value="java">Java</option>
+                            <option value="c">C</option>
+                            <option value="cpp">C++</option>
+                            <option value="javascript">JavaScript</option>
+                        </select>
+                    </div>
+                    <div class="filter-chips mt-3" id="topicChips"></div>
+                </div>
+
+                <!-- Problems List -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Problems</h3>
+                        <span class="text-sm text-gray-500" id="problemCount"></span>
+                    </div>
+                    <div id="problemsList">
+                        ${Components.renderSkeleton('text', 5)}
+                    </div>
+                    <div id="pagination"></div>
+                </div>
+            </div>`;
+
+            loadCodingStats();
+            loadTopics();
+            loadProblems();
+        }
+
+        async function loadCodingStats() {
+            const el = document.getElementById('codingStats');
+            try {
+                const data = await API.get('/questions/my-stats');
+                const stats = data?.data || {};
+                el.innerHTML = `
+                    <div class="stat-card">
+                        <div class="stat-icon green">✅</div>
+                        <div class="stat-content">
+                            <div class="stat-value">${stats.solved || 0}</div>
+                            <div class="stat-label">Problems Solved</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon blue">📊</div>
+                        <div class="stat-content">
+                            <div class="stat-value">${stats.submissions || 0}</div>
+                            <div class="stat-label">Submissions</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon yellow">🎯</div>
+                        <div class="stat-content">
+                            <div class="stat-value">${stats.accuracy || 0}%</div>
+                            <div class="stat-label">Accuracy</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon purple">🔥</div>
+                        <div class="stat-content">
+                            <div class="stat-value">${stats.streak || 0}</div>
+                            <div class="stat-label">Day Streak</div>
+                        </div>
+                    </div>
+                `;
+            } catch (e) {
+                el.innerHTML = '';
+            }
+        }
+
+        async function loadTopics() {
+            try {
+                const data = await API.get('/questions/tags');
+                const tags = data?.data || [];
+                const el = document.getElementById('topicChips');
+                el.innerHTML = tags.slice(0, 10).map(tag => `
+                    <button class="chip" onclick="toggleTopic(this, '${tag.name || tag}')">${tag.name || tag}</button>
+                `).join('');
+            } catch (e) {}
+        }
+
+        async function loadProblems() {
+            const el = document.getElementById('problemsList');
+            const params = { page: currentPage, page_size: 20 };
+            if (currentFilters.difficulty) params.difficulty = currentFilters.difficulty;
+            if (currentFilters.topic) params.topic = currentFilters.topic;
+            if (currentFilters.search) params.search = currentFilters.search;
+
+            try {
+                const data = await API.get('/questions', params);
+                const problems = data?.data?.results || data?.data || [];
+                const total = data?.data?.count || problems.length;
+                
+                document.getElementById('problemCount').textContent = `${total} problems`;
+
+                if (problems.length === 0) {
+                    el.innerHTML = Components.renderEmptyState('💻', 'No problems found', 'Try adjusting your filters');
+                    return;
+                }
+
+                el.innerHTML = problems.map(p => `
+                    <div class="problem-card" onclick="window.location.href='/pages/student/coding-detail.html?id=${p.id}'">
+                        <div class="flex items-center justify-between">
+                            <div class="flex-1">
+                                <h4 class="text-sm font-semibold text-gray-900">${Utils.escapeHtml(p.title)}</h4>
+                                <div class="flex items-center gap-3 mt-1">
+                                    <span class="text-xs difficulty-${(p.difficulty || '').toLowerCase()}">${Utils.escapeHtml(p.difficulty || '')}</span>
+                                    ${(p.tags || []).slice(0, 3).map(t => `<span class="badge badge-gray">${Utils.escapeHtml(t.name || t)}</span>`).join('')}
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                ${p.is_solved ? '<span class="badge badge-success">Solved</span>' : ''}
+                                <span class="text-xs text-gray-400">${p.submission_count || 0} submissions</span>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+
+                const totalPages = Math.ceil(total / 20);
+                document.getElementById('pagination').innerHTML = Components.renderPagination(currentPage, totalPages, 'goToPage');
+            } catch (e) {
+                el.innerHTML = `<p class="text-danger text-sm">Failed to load problems: ${e.message}</p>`;
+            }
+        }
+
+        function goToPage(page) {
+            currentPage = page;
+            loadProblems();
+        }
+
+        function applyFilters() {
+            currentFilters.difficulty = document.getElementById('difficultyFilter').value;
+            currentPage = 1;
+            loadProblems();
+        }
+
+        function toggleTopic(btn, topic) {
+            btn.classList.toggle('active');
+            currentFilters.topic = btn.classList.contains('active') ? topic : '';
+            currentPage = 1;
+            loadProblems();
+        }
+
+        const debouncedSearch = Utils.debounce((value) => {
+            currentFilters.search = value;
+            currentPage = 1;
+            loadProblems();
+        }, 400);
+    </script>
+</body>
+</html>

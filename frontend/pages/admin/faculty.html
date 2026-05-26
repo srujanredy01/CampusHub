@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Faculty Management | CampusHub Admin</title>
+    <link rel="stylesheet" href="/assets/css/variables.css">
+    <link rel="stylesheet" href="/assets/css/base.css">
+    <link rel="stylesheet" href="/assets/css/components.css">
+    <link rel="stylesheet" href="/assets/css/utilities.css">
+    <link rel="stylesheet" href="/assets/css/layout.css">
+</head>
+<body>
+    <div class="app-layout" id="app"></div>
+    <script src="/assets/js/config.js"></script>
+    <script src="/assets/js/api.js"></script>
+    <script src="/assets/js/auth.js"></script>
+    <script src="/assets/js/utils.js"></script>
+    <script src="/assets/js/components.js"></script>
+    <script>
+        if (!Auth.requireAdmin()) throw new Error('Not admin');
+        Components.initLayout('faculty', 'Faculty Management');
+        loadFaculty();
+
+        async function loadFaculty() {
+            const content = document.getElementById('pageContent');
+            content.innerHTML = `
+            <div class="animate-fade-in">
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="text-xl font-bold">Faculty Members</h2>
+                    <button class="btn btn-primary" onclick="showCreateModal()">+ Add Faculty</button>
+                </div>
+                <div class="card"><div id="facultyTable">${Components.renderSkeleton('table')}</div></div>
+            </div>
+            <div class="modal-overlay" id="createModal" onclick="if(event.target===this)Components.closeModal('createModal')">
+                <div class="modal">
+                    <div class="modal-header"><h3 class="modal-title">Add Faculty</h3><button class="modal-close" onclick="Components.closeModal('createModal')">✕</button></div>
+                    <div class="modal-body">
+                        <form onsubmit="createFaculty(event)">
+                            <div class="form-group"><label class="form-label">Full Name</label><input type="text" id="fName" class="form-input" required></div>
+                            <div class="form-group"><label class="form-label">Email</label><input type="email" id="fEmail" class="form-input" required></div>
+                            <div class="form-group"><label class="form-label">Branch</label><input type="text" id="fBranch" class="form-input"></div>
+                            <div class="form-group"><label class="form-label">Password</label><input type="password" id="fPass" class="form-input" required></div>
+                            <button type="submit" class="btn btn-primary w-full">Create Faculty Account</button>
+                        </form>
+                    </div>
+                </div>
+            </div>`;
+            fetchFaculty();
+        }
+
+        async function fetchFaculty() {
+            const el = document.getElementById('facultyTable');
+            try {
+                const data = await API.get('/admin/students', { role: 'faculty' });
+                const faculty = (data?.data?.results || data?.data || []).filter(u => u.role === 'faculty');
+                el.innerHTML = `
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead><tr><th>Name</th><th>Email</th><th>Branch</th><th>Status</th><th>Actions</th></tr></thead>
+                        <tbody>
+                            ${faculty.map(f => `
+                                <tr>
+                                    <td class="font-medium">${Utils.escapeHtml(f.full_name)}</td>
+                                    <td>${Utils.escapeHtml(f.email)}</td>
+                                    <td>${Utils.escapeHtml(f.branch || '—')}</td>
+                                    <td><span class="badge badge-${f.is_active ? 'success' : 'danger'}">${f.is_active ? 'Active' : 'Inactive'}</span></td>
+                                    <td><button class="btn btn-ghost btn-sm" onclick="toggleFaculty('${f.id}', ${f.is_active})">${f.is_active ? 'Deactivate' : 'Activate'}</button></td>
+                                </tr>
+                            `).join('') || '<tr><td colspan="5" class="text-center text-gray-500">No faculty members</td></tr>'}
+                        </tbody>
+                    </table>
+                </div>`;
+            } catch (e) { el.innerHTML = `<p class="text-danger">${e.message}</p>`; }
+        }
+
+        function showCreateModal() { Components.openModal('createModal'); }
+
+        async function createFaculty(e) {
+            e.preventDefault();
+            try {
+                await API.post('/auth/create-faculty', {
+                    full_name: document.getElementById('fName').value,
+                    email: document.getElementById('fEmail').value,
+                    branch: document.getElementById('fBranch').value,
+                    password: document.getElementById('fPass').value,
+                });
+                Toast.success('Faculty account created!');
+                Components.closeModal('createModal');
+                fetchFaculty();
+            } catch (e) { Toast.error(e.message); }
+        }
+
+        async function toggleFaculty(id, isActive) {
+            try {
+                await API.post(`/admin/students/${id}/${isActive ? 'deactivate' : 'activate'}`);
+                Toast.success(isActive ? 'Deactivated' : 'Activated');
+                fetchFaculty();
+            } catch (e) { Toast.error(e.message); }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audit Logs | CampusHub Admin</title>
+    <link rel="stylesheet" href="/assets/css/variables.css">
+    <link rel="stylesheet" href="/assets/css/base.css">
+    <link rel="stylesheet" href="/assets/css/components.css">
+    <link rel="stylesheet" href="/assets/css/utilities.css">
+    <link rel="stylesheet" href="/assets/css/layout.css">
+</head>
+<body>
+    <div class="app-layout" id="app"></div>
+    <script src="/assets/js/config.js"></script>
+    <script src="/assets/js/api.js"></script>
+    <script src="/assets/js/auth.js"></script>
+    <script src="/assets/js/utils.js"></script>
+    <script src="/assets/js/components.js"></script>
+    <script>
+        if (!Auth.requireAdmin()) throw new Error('Not admin');
+        Components.initLayout('audit', 'Audit Logs');
+        loadAuditLogs();
+
+        let currentPage = 1;
+
+        async function loadAuditLogs() {
+            const content = document.getElementById('pageContent');
+            content.innerHTML = `
+            <div class="animate-fade-in">
+                <div class="flex items-center justify-between mb-6">
+                    <div class="search-bar"><span class="search-icon">🔍</span><input type="text" placeholder="Search logs..." oninput="debouncedSearch(this.value)"></div>
+                    <div class="flex gap-2">
+                        <select class="form-input" style="width:auto" onchange="filterByType(this.value)">
+                            <option value="">All Types</option>
+                            <option value="login">Login</option>
+                            <option value="logout">Logout</option>
+                            <option value="signup">Signup</option>
+                            <option value="password_change">Password Change</option>
+                            <option value="resource_upload">Resource Upload</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="card"><div id="logsTable">${Components.renderSkeleton('table')}</div><div id="pagination"></div></div>
+            </div>`;
+            fetchLogs();
+        }
+
+        async function fetchLogs(search = '', type = '') {
+            const el = document.getElementById('logsTable');
+            try {
+                const params = { page: currentPage, page_size: 30 };
+                if (search) params.search = search;
+                if (type) params.action_type = type;
+                const data = await API.get('/admin/logs', params);
+                const logs = data?.data?.results || data?.data || [];
+                const total = data?.data?.count || logs.length;
+
+                el.innerHTML = `
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead><tr><th>Time</th><th>User</th><th>Action</th><th>IP</th><th>Details</th></tr></thead>
+                        <tbody>
+                            ${logs.map(l => `
+                                <tr>
+                                    <td class="text-xs">${Utils.formatDateTime(l.created_at || l.timestamp)}</td>
+                                    <td class="font-medium text-sm">${Utils.escapeHtml(l.user_email || l.user_name || '—')}</td>
+                                    <td><span class="badge badge-info">${Utils.escapeHtml(l.action_type || l.action || '')}</span></td>
+                                    <td class="text-xs text-gray-500">${Utils.escapeHtml(l.ip_address || '—')}</td>
+                                    <td class="text-xs text-gray-500">${Utils.escapeHtml(JSON.stringify(l.metadata || l.details || '').substring(0, 50))}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>`;
+
+                document.getElementById('pagination').innerHTML = Components.renderPagination(currentPage, Math.ceil(total / 30), 'goToPage');
+            } catch (e) { el.innerHTML = `<p class="text-danger">${e.message}</p>`; }
+        }
+
+        function goToPage(p) { currentPage = p; fetchLogs(); }
+        function filterByType(type) { currentPage = 1; fetchLogs('', type); }
+        const debouncedSearch = Utils.debounce((v) => { currentPage = 1; fetchLogs(v); }, 400);
+    </script>
+</body>
+</html>

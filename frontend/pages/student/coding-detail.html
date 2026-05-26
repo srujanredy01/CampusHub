@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Code Editor | CampusHub</title>
+    <link rel="stylesheet" href="/assets/css/variables.css">
+    <link rel="stylesheet" href="/assets/css/base.css">
+    <link rel="stylesheet" href="/assets/css/components.css">
+    <link rel="stylesheet" href="/assets/css/utilities.css">
+    <link rel="stylesheet" href="/assets/css/layout.css">
+    <style>
+        .code-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 0; height: calc(100vh - var(--navbar-height)); }
+        .problem-panel { overflow-y: auto; padding: var(--space-6); border-right: 1px solid var(--gray-200); }
+        .editor-panel { display: flex; flex-direction: column; }
+        .editor-toolbar { display: flex; align-items: center; justify-content: space-between; padding: var(--space-3) var(--space-4); background: var(--gray-800); border-bottom: 1px solid var(--gray-700); }
+        .code-editor { flex: 1; background: var(--gray-900); color: #e2e8f0; font-family: var(--font-mono); font-size: 14px; padding: var(--space-4); border: none; resize: none; outline: none; line-height: 1.6; tab-size: 4; }
+        .output-panel { height: 200px; background: var(--gray-800); border-top: 1px solid var(--gray-700); padding: var(--space-4); overflow-y: auto; }
+        .output-panel pre { color: #a5f3fc; font-family: var(--font-mono); font-size: 13px; white-space: pre-wrap; }
+        .output-panel .error { color: #fca5a5; }
+        .test-case { padding: var(--space-3); background: var(--gray-50); border-radius: var(--radius-md); margin-bottom: var(--space-2); }
+        @media (max-width: 1024px) { .code-layout { grid-template-columns: 1fr; } .problem-panel { max-height: 40vh; } }
+    </style>
+</head>
+<body>
+    <div id="app" style="height:100vh; display:flex; flex-direction:column;">
+        <header class="navbar" style="position:relative; left:0;">
+            <div class="navbar-left">
+                <a href="/pages/student/coding.html" class="btn btn-ghost btn-sm">← Back</a>
+                <h1 class="navbar-title" id="problemTitle">Loading...</h1>
+            </div>
+            <div class="navbar-right">
+                <select class="form-input" style="width:auto; background:var(--gray-100)" id="languageSelect">
+                    <option value="python">Python</option>
+                    <option value="java">Java</option>
+                    <option value="c">C</option>
+                    <option value="cpp">C++</option>
+                    <option value="javascript">JavaScript</option>
+                </select>
+                <button class="btn btn-secondary btn-sm" onclick="runCode()">▶ Run</button>
+                <button class="btn btn-primary btn-sm" onclick="submitCode()">Submit</button>
+            </div>
+        </header>
+
+        <div class="code-layout">
+            <!-- Problem Description -->
+            <div class="problem-panel" id="problemPanel">
+                <div class="spinner" style="margin:2rem auto"></div>
+            </div>
+
+            <!-- Code Editor -->
+            <div class="editor-panel">
+                <div class="editor-toolbar">
+                    <span style="color:var(--gray-400); font-size:var(--text-sm)">Code Editor</span>
+                    <button class="btn btn-ghost btn-sm" style="color:var(--gray-400)" onclick="resetCode()">↺ Reset</button>
+                </div>
+                <textarea class="code-editor" id="codeEditor" spellcheck="false" placeholder="Write your code here..."></textarea>
+                <div class="output-panel" id="outputPanel">
+                    <pre style="color:var(--gray-400)">Output will appear here after running your code.</pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/assets/js/config.js"></script>
+    <script src="/assets/js/api.js"></script>
+    <script src="/assets/js/auth.js"></script>
+    <script src="/assets/js/utils.js"></script>
+    <script>
+        if (!Auth.requireAuth()) throw new Error('Not authenticated');
+
+        const params = Utils.getQueryParams();
+        const problemId = params.id;
+        let problem = null;
+
+        if (!problemId) {
+            document.getElementById('problemPanel').innerHTML = '<p class="text-danger">No problem ID specified.</p>';
+        } else {
+            loadProblem();
+        }
+
+        async function loadProblem() {
+            try {
+                const data = await API.get(`/questions/${problemId}`);
+                problem = data?.data || data;
+                document.getElementById('problemTitle').textContent = problem.title || 'Problem';
+                Utils.setPageTitle(problem.title);
+
+                document.getElementById('problemPanel').innerHTML = `
+                    <div class="mb-4">
+                        <div class="flex items-center gap-3 mb-3">
+                            <span class="badge badge-${Utils.getDifficultyColor(problem.difficulty)}">${problem.difficulty || 'Medium'}</span>
+                            ${(problem.tags || []).map(t => `<span class="badge badge-gray">${Utils.escapeHtml(t.name || t)}</span>`).join('')}
+                        </div>
+                        <h2 class="text-xl font-bold mb-4">${Utils.escapeHtml(problem.title)}</h2>
+                        <div class="text-sm text-gray-700" style="line-height:1.8">${problem.description || ''}</div>
+                    </div>
+
+                    ${problem.examples ? `
+                    <div class="mt-6">
+                        <h4 class="font-semibold mb-3">Examples</h4>
+                        ${(problem.examples || []).map((ex, i) => `
+                            <div class="test-case">
+                                <p class="text-xs font-medium text-gray-500 mb-1">Example ${i + 1}</p>
+                                <p class="text-sm"><strong>Input:</strong> <code>${Utils.escapeHtml(ex.input || '')}</code></p>
+                                <p class="text-sm"><strong>Output:</strong> <code>${Utils.escapeHtml(ex.output || '')}</code></p>
+                                ${ex.explanation ? `<p class="text-sm text-gray-500 mt-1"><strong>Explanation:</strong> ${Utils.escapeHtml(ex.explanation)}</p>` : ''}
+                            </div>
+                        `).join('')}
+                    </div>` : ''}
+
+                    ${problem.constraints ? `
+                    <div class="mt-6">
+                        <h4 class="font-semibold mb-2">Constraints</h4>
+                        <div class="text-sm text-gray-600">${problem.constraints}</div>
+                    </div>` : ''}
+
+                    <!-- Submissions History -->
+                    <div class="mt-6">
+                        <h4 class="font-semibold mb-3">Your Submissions</h4>
+                        <div id="submissions">Loading...</div>
+                    </div>
+                `;
+
+                // Load draft code
+                loadDraft();
+                loadSubmissions();
+            } catch (e) {
+                document.getElementById('problemPanel').innerHTML = `<p class="text-danger">Failed to load problem: ${e.message}</p>`;
+            }
+        }
+
+        async function loadDraft() {
+            try {
+                const data = await API.get(`/questions/${problemId}/draft`);
+                if (data?.data?.code) {
+                    document.getElementById('codeEditor').value = data.data.code;
+                    if (data.data.language) {
+                        document.getElementById('languageSelect').value = data.data.language;
+                    }
+                }
+            } catch (e) {}
+        }
+
+        async function loadSubmissions() {
+            const el = document.getElementById('submissions');
+            try {
+                const data = await API.get(`/questions/${problemId}/submissions`);
+                const subs = data?.data || [];
+                if (subs.length === 0) {
+                    el.innerHTML = '<p class="text-sm text-gray-500">No submissions yet</p>';
+                    return;
+                }
+                el.innerHTML = subs.slice(0, 5).map(s => `
+                    <div class="flex items-center justify-between py-2 border-b" style="border-color:var(--gray-100)">
+                        <div>
+                            <span class="badge badge-${s.status === 'accepted' ? 'success' : 'danger'}">${s.status}</span>
+                            <span class="text-xs text-gray-500 ml-2">${s.language}</span>
+                        </div>
+                        <span class="text-xs text-gray-400">${Utils.timeAgo(s.submitted_at)}</span>
+                    </div>
+                `).join('');
+            } catch (e) {
+                el.innerHTML = '<p class="text-xs text-gray-400">Unable to load submissions</p>';
+            }
+        }
+
+        async function runCode() {
+            const output = document.getElementById('outputPanel');
+            const code = document.getElementById('codeEditor').value;
+            const language = document.getElementById('languageSelect').value;
+
+            output.innerHTML = '<pre style="color:var(--gray-400)">Running...</pre>';
+
+            try {
+                const data = await API.post('/code/run', { code, language, question_id: problemId });
+                const result = data?.data || data;
+                if (result.error) {
+                    output.innerHTML = `<pre class="error">${Utils.escapeHtml(result.error)}</pre>`;
+                } else {
+                    output.innerHTML = `<pre>${Utils.escapeHtml(result.output || 'No output')}</pre>
+                        ${result.execution_time ? `<p style="color:var(--gray-400); font-size:12px; margin-top:8px">Time: ${result.execution_time}ms | Memory: ${result.memory_used || '—'}</p>` : ''}`;
+                }
+            } catch (e) {
+                output.innerHTML = `<pre class="error">${Utils.escapeHtml(e.message)}</pre>`;
+            }
+        }
+
+        async function submitCode() {
+            const output = document.getElementById('outputPanel');
+            const code = document.getElementById('codeEditor').value;
+            const language = document.getElementById('languageSelect').value;
+
+            if (!code.trim()) {
+                output.innerHTML = '<pre class="error">Please write some code before submitting.</pre>';
+                return;
+            }
+
+            output.innerHTML = '<pre style="color:var(--gray-400)">Submitting...</pre>';
+
+            try {
+                const data = await API.post('/code/submit', { code, language, question_id: problemId });
+                const result = data?.data || data;
+                if (result.status === 'accepted') {
+                    output.innerHTML = `<pre style="color:#86efac">✓ Accepted! All test cases passed.</pre>
+                        <p style="color:var(--gray-400); font-size:12px; margin-top:8px">Time: ${result.execution_time || '—'}ms | Memory: ${result.memory_used || '—'}</p>`;
+                } else {
+                    output.innerHTML = `<pre class="error">✕ ${result.status || 'Wrong Answer'}\n${result.error || result.message || ''}</pre>`;
+                }
+                loadSubmissions();
+            } catch (e) {
+                output.innerHTML = `<pre class="error">${Utils.escapeHtml(e.message)}</pre>`;
+            }
+        }
+
+        function resetCode() {
+            document.getElementById('codeEditor').value = '';
+        }
+
+        // Auto-save draft
+        let saveTimer;
+        document.getElementById('codeEditor').addEventListener('input', () => {
+            clearTimeout(saveTimer);
+            saveTimer = setTimeout(async () => {
+                const code = document.getElementById('codeEditor').value;
+                const language = document.getElementById('languageSelect').value;
+                try {
+                    await API.put(`/questions/${problemId}/draft`, { code, language });
+                } catch (e) {}
+            }, 2000);
+        });
+
+        // Tab support in editor
+        document.getElementById('codeEditor').addEventListener('keydown', (e) => {
+            if (e.key === 'Tab') {
+                e.preventDefault();
+                const start = e.target.selectionStart;
+                const end = e.target.selectionEnd;
+                e.target.value = e.target.value.substring(0, start) + '    ' + e.target.value.substring(end);
+                e.target.selectionStart = e.target.selectionEnd = start + 4;
+            }
+        });
+    </script>
+</body>
+</html>

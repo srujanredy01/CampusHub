@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Roadmap | CampusHub</title>
+    <link rel="stylesheet" href="/assets/css/variables.css">
+    <link rel="stylesheet" href="/assets/css/base.css">
+    <link rel="stylesheet" href="/assets/css/components.css">
+    <link rel="stylesheet" href="/assets/css/utilities.css">
+    <link rel="stylesheet" href="/assets/css/layout.css">
+    <style>
+        .milestone-item { padding: var(--space-5); border-left: 3px solid var(--gray-200); margin-left: var(--space-6); position: relative; }
+        .milestone-item.completed { border-left-color: var(--success-500); }
+        .milestone-dot { width: 14px; height: 14px; border-radius: var(--radius-full); background: var(--gray-300); border: 3px solid var(--surface-bg); position: absolute; left: -9px; top: var(--space-5); }
+        .milestone-item.completed .milestone-dot { background: var(--success-500); }
+        .step-check { width: 20px; height: 20px; border-radius: var(--radius-md); border: 2px solid var(--gray-300); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all var(--transition-fast); flex-shrink: 0; }
+        .step-check.checked { background: var(--success-500); border-color: var(--success-500); color: #fff; }
+    </style>
+</head>
+<body>
+    <div class="app-layout" id="app"></div>
+    <script src="/assets/js/config.js"></script>
+    <script src="/assets/js/api.js"></script>
+    <script src="/assets/js/auth.js"></script>
+    <script src="/assets/js/utils.js"></script>
+    <script src="/assets/js/components.js"></script>
+    <script>
+        if (!Auth.requireAuth()) throw new Error('Not authenticated');
+        Components.initLayout('roadmaps', 'Roadmap');
+
+        const params = Utils.getQueryParams();
+        loadRoadmap(params.slug);
+
+        async function loadRoadmap(slug) {
+            const content = document.getElementById('pageContent');
+            if (!slug) { content.innerHTML = '<p class="text-danger">No roadmap specified</p>'; return; }
+
+            try {
+                const data = await API.get(`/roadmaps/${slug}`);
+                const r = data?.data || data;
+                Utils.setPageTitle(r.title);
+
+                const progress = r.progress || 0;
+                content.innerHTML = `
+                <div class="animate-fade-in">
+                    <a href="/pages/student/roadmaps.html" class="btn btn-ghost btn-sm mb-4">← Back to Roadmaps</a>
+                    
+                    <div class="card mb-6">
+                        <div class="flex items-start justify-between">
+                            <div>
+                                <h2 class="text-2xl font-bold">${Utils.escapeHtml(r.title)}</h2>
+                                <p class="text-sm text-gray-500 mt-2">${Utils.escapeHtml(r.description || '')}</p>
+                            </div>
+                            ${!r.is_enrolled ? `<button class="btn btn-primary" onclick="enroll('${slug}')">Enroll</button>` : '<span class="badge badge-success">Enrolled</span>'}
+                        </div>
+                        <div class="mt-4">
+                            <div class="flex justify-between text-sm mb-2">
+                                <span>Progress</span>
+                                <span class="font-semibold">${progress}%</span>
+                            </div>
+                            <div class="progress-bar"><div class="progress-fill" style="width:${progress}%"></div></div>
+                        </div>
+                    </div>
+
+                    <!-- Milestones -->
+                    <div class="card">
+                        <h3 class="card-title mb-6">Milestones</h3>
+                        <div id="milestones">
+                            ${(r.milestones || []).map(m => `
+                                <div class="milestone-item ${m.is_completed ? 'completed' : ''}">
+                                    <div class="milestone-dot"></div>
+                                    <h4 class="font-semibold mb-2">${Utils.escapeHtml(m.title)}</h4>
+                                    <p class="text-sm text-gray-500 mb-3">${Utils.escapeHtml(m.description || '')}</p>
+                                    <div class="flex flex-col gap-2">
+                                        ${(m.steps || []).map(s => `
+                                            <div class="flex items-center gap-3">
+                                                <div class="step-check ${s.is_completed ? 'checked' : ''}" onclick="toggleStep('${s.id}', ${!s.is_completed})">
+                                                    ${s.is_completed ? '✓' : ''}
+                                                </div>
+                                                <span class="text-sm ${s.is_completed ? 'text-gray-400' : 'text-gray-700'}" style="${s.is_completed ? 'text-decoration:line-through' : ''}">${Utils.escapeHtml(s.title)}</span>
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>`;
+            } catch (e) {
+                content.innerHTML = `<p class="text-danger">${e.message}</p>`;
+            }
+        }
+
+        async function enroll(slug) {
+            try {
+                await API.post(`/roadmaps/${slug}/enroll`);
+                Toast.success('Enrolled successfully!');
+                loadRoadmap(slug);
+            } catch (e) { Toast.error(e.message); }
+        }
+
+        async function toggleStep(stepId, complete) {
+            try {
+                const endpoint = complete ? `/roadmaps/steps/${stepId}/complete` : `/roadmaps/steps/${stepId}/uncomplete`;
+                await API.post(endpoint);
+                loadRoadmap(params.slug);
+            } catch (e) { Toast.error(e.message); }
+        }
+    </script>
+</body>
+</html>

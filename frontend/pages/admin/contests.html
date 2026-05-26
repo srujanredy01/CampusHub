@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Contest Management | CampusHub Admin</title>
+    <link rel="stylesheet" href="/assets/css/variables.css">
+    <link rel="stylesheet" href="/assets/css/base.css">
+    <link rel="stylesheet" href="/assets/css/components.css">
+    <link rel="stylesheet" href="/assets/css/utilities.css">
+    <link rel="stylesheet" href="/assets/css/layout.css">
+</head>
+<body>
+    <div class="app-layout" id="app"></div>
+    <script src="/assets/js/config.js"></script>
+    <script src="/assets/js/api.js"></script>
+    <script src="/assets/js/auth.js"></script>
+    <script src="/assets/js/utils.js"></script>
+    <script src="/assets/js/components.js"></script>
+    <script>
+        if (!Auth.requireAdmin()) throw new Error('Not admin');
+        Components.initLayout('contests', 'Contest Management');
+        loadAdminContests();
+
+        async function loadAdminContests() {
+            const content = document.getElementById('pageContent');
+            try {
+                const data = await API.get('/contests');
+                const contests = data?.data?.results || data?.data || [];
+                content.innerHTML = `
+                <div class="animate-fade-in">
+                    <div class="flex items-center justify-between mb-6">
+                        <p class="text-sm text-gray-500">${contests.length} contests</p>
+                        <button class="btn btn-primary" onclick="Toast.info('Create contest form coming soon')">+ Create Contest</button>
+                    </div>
+                    <div class="card">
+                        <div class="table-container">
+                            <table class="data-table">
+                                <thead><tr><th>Title</th><th>Start</th><th>End</th><th>Participants</th><th>Status</th></tr></thead>
+                                <tbody>
+                                    ${contests.map(c => {
+                                        const now = new Date();
+                                        const start = new Date(c.start_time);
+                                        const end = new Date(c.end_time);
+                                        let status = 'upcoming';
+                                        if (now >= start && now <= end) status = 'live';
+                                        else if (now > end) status = 'ended';
+                                        return `<tr>
+                                            <td class="font-medium">${Utils.escapeHtml(c.title)}</td>
+                                            <td class="text-sm">${Utils.formatDateTime(c.start_time)}</td>
+                                            <td class="text-sm">${Utils.formatDateTime(c.end_time)}</td>
+                                            <td>${c.participants_count || 0}</td>
+                                            <td><span class="badge badge-${status === 'live' ? 'success' : status === 'upcoming' ? 'info' : 'gray'}">${status}</span></td>
+                                        </tr>`;
+                                    }).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>`;
+            } catch (e) { content.innerHTML = `<p class="text-danger">${e.message}</p>`; }
+        }
+    </script>
+</body>
+</html>

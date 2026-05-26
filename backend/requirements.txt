@@ -38,3 +38,12 @@ bleach==6.1.0
 
 # ── Structured logging ────────────────────────────────────────────────────────
 python-json-logger==2.0.7
+
+# ── PDF Generation (Resume Builder) ──────────────────────────────────────────
+reportlab==4.1.0
+
+# ── Redis & Celery ────────────────────────────────────────────────────────────
+redis==5.0.4
+django-redis==5.4.0
+celery==5.4.0
+channels-redis==4.2.0

@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grading | CampusHub Faculty</title>
+    <link rel="stylesheet" href="/assets/css/variables.css">
+    <link rel="stylesheet" href="/assets/css/base.css">
+    <link rel="stylesheet" href="/assets/css/components.css">
+    <link rel="stylesheet" href="/assets/css/utilities.css">
+    <link rel="stylesheet" href="/assets/css/layout.css">
+</head>
+<body>
+    <div class="app-layout" id="app"></div>
+    <script src="/assets/js/config.js"></script>
+    <script src="/assets/js/api.js"></script>
+    <script src="/assets/js/auth.js"></script>
+    <script src="/assets/js/utils.js"></script>
+    <script src="/assets/js/components.js"></script>
+    <script>
+        if (!Auth.requireFaculty()) throw new Error('Not faculty');
+        Components.initLayout('grading', 'Grading');
+
+        document.getElementById('pageContent').innerHTML = `
+        <div class="animate-fade-in">
+            <div class="card">
+                <h3 class="card-title mb-4">Pending Submissions</h3>
+                <p class="text-sm text-gray-500">Select an assignment to view and grade submissions.</p>
+                <div class="mt-4" id="gradingList">${Components.renderSkeleton('text', 3)}</div>
+            </div>
+        </div>`;
+
+        loadGrading();
+
+        async function loadGrading() {
+            const el = document.getElementById('gradingList');
+            try {
+                const data = await API.get('/assignments');
+                const items = data?.data?.results || data?.data || [];
+                el.innerHTML = items.map(a => `
+                    <div class="flex items-center justify-between py-3 border-b" style="border-color:var(--gray-100)">
+                        <div>
+                            <p class="font-medium text-sm">${Utils.escapeHtml(a.title)}</p>
+                            <p class="text-xs text-gray-500">${a.submission_count || 0} submissions</p>
+                        </div>
+                        <button class="btn btn-primary btn-sm" onclick="Toast.info('Grading interface coming soon')">Grade</button>
+                    </div>
+                `).join('') || '<p class="text-sm text-gray-500">No assignments to grade</p>';
+            } catch (e) { el.innerHTML = `<p class="text-danger">${e.message}</p>`; }
+        }
+    </script>
+</body>
+</html>

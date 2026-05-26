@@ -5,6 +5,7 @@ import { logout } from "../../store/slices/authSlice";
 import NotificationBell from "./NotificationBell";
 import AdminAlertBell from "../admin/AdminAlertBell";
 import { useNotificationWebSocket } from "../../hooks/useNotificationWebSocket";
+import GlobalSearch from "./GlobalSearch";
 
 // ── SVG Icons ─────────────────────────────────────────────────────────────────
 const Icons = {
@@ -36,6 +37,12 @@ const studentNav = [
   { to: "/notes",        Icon: Icons.Notes,         label: "Notes" },
   { to: "/news",         Icon: Icons.News,          label: "News & Updates" },
   { to: "/coding",       Icon: Icons.Coding,        label: "Coding Hub" },
+  { to: "/contests",     Icon: Icons.Questions,     label: "Contests" },
+  { to: "/assignments",  Icon: Icons.Notes,         label: "Assignments" },
+  { to: "/roadmaps",     Icon: Icons.CGPA,          label: "Career Roadmaps" },
+  { to: "/resume",       Icon: Icons.Profile,       label: "Resume Builder" },
+  { to: "/leaderboard",  Icon: Icons.Placement,     label: "Leaderboard" },
+  { to: "/lost-found",   Icon: Icons.Questions,     label: "Lost & Found" },
   { to: "/cgpa",         Icon: Icons.CGPA,          label: "Academic Performance" },
   { to: "/groups",       Icon: Icons.Groups,        label: "Study Groups" },
   { to: "/placement",    Icon: Icons.Placement,     label: "Placement" },
@@ -63,6 +70,11 @@ const routeTitle = {
   "/notes":                 "Notes Sharing",
   "/news":                  "News & Updates",
   "/coding":                "Coding Hub",
+  "/assignments":           "Assignments",
+  "/roadmaps":              "Career Roadmaps",
+  "/resume":                "Resume Builder",
+  "/leaderboard":           "Leaderboard",
+  "/lost-found":            "Lost & Found",
   "/cgpa":                  "Academic Performance",
   "/groups":                "Study Groups",
   "/placement":             "Placement Tracker",
@@ -337,7 +349,10 @@ export default function Layout({ isAdmin = false }) {
           </button>
 
           <div className="flex-1 min-w-0">
-            <h1 className="text-base font-semibold text-slate-900 truncate">{currentTitle}</h1>
+            <div className="hidden md:block">
+              <GlobalSearch />
+            </div>
+            <h1 className="text-base font-semibold text-slate-900 truncate md:hidden">{currentTitle}</h1>
           </div>
 
           <div className="flex items-center gap-2">

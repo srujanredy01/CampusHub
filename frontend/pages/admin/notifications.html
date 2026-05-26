@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notifications Management | CampusHub Admin</title>
+    <link rel="stylesheet" href="/assets/css/variables.css">
+    <link rel="stylesheet" href="/assets/css/base.css">
+    <link rel="stylesheet" href="/assets/css/components.css">
+    <link rel="stylesheet" href="/assets/css/utilities.css">
+    <link rel="stylesheet" href="/assets/css/layout.css">
+</head>
+<body>
+    <div class="app-layout" id="app"></div>
+    <script src="/assets/js/config.js"></script>
+    <script src="/assets/js/api.js"></script>
+    <script src="/assets/js/auth.js"></script>
+    <script src="/assets/js/utils.js"></script>
+    <script src="/assets/js/components.js"></script>
+    <script>
+        if (!Auth.requireAdmin()) throw new Error('Not admin');
+        Components.initLayout('notifications', 'Notifications Management');
+        loadNotifPage();
+
+        function loadNotifPage() {
+            const content = document.getElementById('pageContent');
+            content.innerHTML = `
+            <div class="animate-fade-in">
+                <div class="card mb-6">
+                    <h3 class="card-title mb-4">Send Notification</h3>
+                    <form onsubmit="sendNotification(event)">
+                        <div class="form-group"><label class="form-label">Title</label><input type="text" id="nTitle" class="form-input" required placeholder="Notification title"></div>
+                        <div class="form-group"><label class="form-label">Message</label><textarea id="nMessage" class="form-input" rows="3" required placeholder="Notification message..."></textarea></div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="form-group">
+                                <label class="form-label">Target</label>
+                                <select id="nTarget" class="form-input">
+                                    <option value="all">All Users</option>
+                                    <option value="students">Students Only</option>
+                                    <option value="faculty">Faculty Only</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Type</label>
+                                <select id="nType" class="form-input">
+                                    <option value="info">Info</option>
+                                    <option value="warning">Warning</option>
+                                    <option value="success">Success</option>
+                                    <option value="urgent">Urgent</option>
+                                </select>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Send Notification</button>
+                    </form>
+                </div>
+
+                <div class="card">
+                    <h3 class="card-title mb-4">Scheduled Notifications</h3>
+                    <div id="scheduledList">Loading...</div>
+                </div>
+            </div>`;
+
+            loadScheduled();
+        }
+
+        async function sendNotification(e) {
+            e.preventDefault();
+            try {
+                await API.post('/admin/notifications', {
+                    title: document.getElementById('nTitle').value,
+                    message: document.getElementById('nMessage').value,
+                    target: document.getElementById('nTarget').value,
+                    type: document.getElementById('nType').value,
+                });
+                Toast.success('Notification sent!');
+                e.target.reset();
+            } catch (e) { Toast.error(e.message); }
+        }
+
+        async function loadScheduled() {
+            const el = document.getElementById('scheduledList');
+            try {
+                const data = await API.get('/admin/notifications/scheduled');
+                const items = data?.data?.results || data?.data || [];
+                if (items.length === 0) { el.innerHTML = '<p class="text-sm text-gray-500">No scheduled notifications</p>'; return; }
+                el.innerHTML = items.map(n => `
+                    <div class="flex items-center justify-between py-3 border-b" style="border-color:var(--gray-100)">
+                        <div>
+                            <p class="text-sm font-medium">${Utils.escapeHtml(n.title)}</p>
+                            <p class="text-xs text-gray-500">${Utils.formatDateTime(n.scheduled_at)}</p>
+                        </div>
+                        <span class="badge badge-${n.is_approved ? 'success' : 'warning'}">${n.is_approved ? 'Approved' : 'Pending'}</span>
+                    </div>
+                `).join('');
+            } catch (e) { el.innerHTML = '<p class="text-sm text-gray-500">Unable to load</p>'; }
+        }
+    </script>
+</body>
+</html>

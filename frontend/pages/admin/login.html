@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Login | CampusHub</title>
+    <link rel="stylesheet" href="/assets/css/variables.css">
+    <link rel="stylesheet" href="/assets/css/base.css">
+    <link rel="stylesheet" href="/assets/css/components.css">
+    <link rel="stylesheet" href="/assets/css/utilities.css">
+    <link rel="stylesheet" href="/assets/css/layout.css">
+</head>
+<body>
+    <div class="auth-layout">
+        <div class="auth-card animate-fade-in">
+            <div class="auth-header">
+                <div class="auth-logo">🔐</div>
+                <h1 class="auth-title">Admin Access</h1>
+                <p class="auth-subtitle">Sign in with your admin credentials</p>
+            </div>
+
+            <form id="loginForm" onsubmit="handleAdminLogin(event)">
+                <div class="form-group">
+                    <label class="form-label" for="email">Admin Email</label>
+                    <input type="email" id="email" class="form-input" placeholder="admin@campushub.com" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="password">Password</label>
+                    <input type="password" id="password" class="form-input" placeholder="Enter password" required>
+                </div>
+                <button type="submit" class="btn btn-primary w-full btn-lg" id="loginBtn">Sign In as Admin</button>
+                <div id="loginError" class="form-error text-center mt-4" style="display:none"></div>
+            </form>
+
+            <div class="auth-footer">
+                <a href="/pages/auth/login.html">← Back to Student Login</a>
+            </div>
+        </div>
+    </div>
+
+    <script src="/assets/js/config.js"></script>
+    <script src="/assets/js/api.js"></script>
+    <script src="/assets/js/auth.js"></script>
+    <script src="/assets/js/utils.js"></script>
+    <script>
+        if (Auth.isAuthenticated() && Auth.isAdmin()) {
+            window.location.href = '/pages/admin/dashboard.html';
+        }
+
+        async function handleAdminLogin(e) {
+            e.preventDefault();
+            const btn = document.getElementById('loginBtn');
+            const errorEl = document.getElementById('loginError');
+            const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value;
+
+            btn.disabled = true;
+            btn.textContent = 'Signing in...';
+            errorEl.style.display = 'none';
+
+            try {
+                const data = await Auth.login(email, password);
+                if (data.success) {
+                    const user = data.data.user;
+                    if (user.role === 'admin' || user.role === 'super_admin') {
+                        window.location.href = '/pages/admin/dashboard.html';
+                    } else {
+                        errorEl.textContent = 'Access denied. Admin credentials required.';
+                        errorEl.style.display = 'block';
+                        Auth.logout();
+                    }
+                }
+            } catch (error) {
+                errorEl.textContent = error.message || 'Invalid credentials.';
+                errorEl.style.display = 'block';
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Sign In as Admin';
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Contest | CampusHub</title>
+    <link rel="stylesheet" href="/assets/css/variables.css">
+    <link rel="stylesheet" href="/assets/css/base.css">
+    <link rel="stylesheet" href="/assets/css/components.css">
+    <link rel="stylesheet" href="/assets/css/utilities.css">
+    <link rel="stylesheet" href="/assets/css/layout.css">
+</head>
+<body>
+    <div class="app-layout" id="app"></div>
+    <script src="/assets/js/config.js"></script>
+    <script src="/assets/js/api.js"></script>
+    <script src="/assets/js/auth.js"></script>
+    <script src="/assets/js/utils.js"></script>
+    <script src="/assets/js/components.js"></script>
+    <script>
+        if (!Auth.requireAuth()) throw new Error('Not authenticated');
+        Components.initLayout('contests', 'Contest Detail');
+
+        const params = Utils.getQueryParams();
+        loadContest(params.id);
+
+        async function loadContest(id) {
+            const content = document.getElementById('pageContent');
+            if (!id) { content.innerHTML = '<p class="text-danger">No contest ID</p>'; return; }
+
+            try {
+                const data = await API.get(`/contests/${id}`);
+                const c = data?.data || data;
+                Utils.setPageTitle(c.title);
+
+                const now = new Date();
+                const start = new Date(c.start_time);
+                const end = new Date(c.end_time);
+                let status = 'upcoming';
+                if (now >= start && now <= end) status = 'live';
+                else if (now > end) status = 'ended';
+
+                content.innerHTML = `
+                <div class="animate-fade-in">
+                    <a href="/pages/student/contests.html" class="btn btn-ghost btn-sm mb-4">← Back to Contests</a>
+                    
+                    <div class="card mb-6">
+                        <div class="flex items-start justify-between">
+                            <div>
+                                <h2 class="text-2xl font-bold">${Utils.escapeHtml(c.title)}</h2>
+                                <p class="text-sm text-gray-500 mt-2">${Utils.formatDateTime(c.start_time)} — ${Utils.formatDateTime(c.end_time)}</p>
+                                <p class="text-sm text-gray-600 mt-3">${Utils.escapeHtml(c.description || '')}</p>
+                            </div>
+                            <div class="text-center">
+                                ${status === 'upcoming' ? `
+                                    <div id="contestCountdown" style="font-family:var(--font-mono);font-size:1.5rem;font-weight:700;color:var(--primary-600)"></div>
+                                    <button class="btn btn-primary mt-3" onclick="registerContest('${id}')">Register</button>
+                                ` : ''}
+                                ${status === 'live' ? '<span class="badge badge-success" style="font-size:1rem;padding:0.5rem 1rem">🔴 LIVE</span>' : ''}
+                                ${status === 'ended' ? '<span class="badge badge-gray" style="font-size:1rem;padding:0.5rem 1rem">Ended</span>' : ''}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Problems -->
+                    <div class="card mb-6">
+                        <h3 class="card-title mb-4">Problems</h3>
+                        <div id="contestProblems">
+                            ${(c.problems || []).map((p, i) => `
+                                <div class="flex items-center justify-between py-3 border-b" style="border-color:var(--gray-100)">
+                                    <div class="flex items-center gap-3">
+                                        <span class="text-sm font-mono text-gray-400">${String.fromCharCode(65 + i)}</span>
+                                        <span class="text-sm font-medium">${Utils.escapeHtml(p.title)}</span>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <span class="badge badge-${Utils.getDifficultyColor(p.difficulty)}">${p.difficulty}</span>
+                                        <span class="text-xs text-gray-400">${p.points || 100} pts</span>
+                                    </div>
+                                </div>
+                            `).join('') || '<p class="text-sm text-gray-500">Problems will be revealed when contest starts</p>'}
+                        </div>
+                    </div>
+
+                    <!-- Leaderboard -->
+                    <div class="card">
+                        <h3 class="card-title mb-4">Leaderboard</h3>
+                        <div id="contestLeaderboard">Loading...</div>
+                    </div>
+                </div>`;
+
+                if (status === 'upcoming') {
+                    Utils.countdown(c.start_time, (t) => {
+                        const el = document.getElementById('contestCountdown');
+                        if (el) el.textContent = t.expired ? 'Started!' : `${t.days}d ${t.hours}h ${t.minutes}m ${t.seconds}s`;
+                    });
+                }
+
+                loadLeaderboard(id);
+            } catch (e) {
+                content.innerHTML = `<p class="text-danger">${e.message}</p>`;
+            }
+        }
+
+        async function loadLeaderboard(id) {
+            const el = document.getElementById('contestLeaderboard');
+            try {
+                const data = await API.get(`/contests/${id}/leaderboard`);
+                const entries = data?.data || [];
+                if (entries.length === 0) { el.innerHTML = '<p class="text-sm text-gray-500">No entries yet</p>'; return; }
+
+                el.innerHTML = `
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead><tr><th>Rank</th><th>Name</th><th>Score</th><th>Time</th></tr></thead>
+                        <tbody>
+                            ${entries.slice(0, 20).map((e, i) => `
+                                <tr>
+                                    <td><strong>${i + 1}</strong></td>
+                                    <td>${Utils.escapeHtml(e.user_name || e.full_name || '')}</td>
+                                    <td>${e.score || 0}</td>
+                                    <td class="text-gray-500">${e.total_time || '—'}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>`;
+            } catch (e) {
+                el.innerHTML = '<p class="text-sm text-gray-500">Leaderboard unavailable</p>';
+            }
+        }
+
+        async function registerContest(id) {
+            try {
+                await API.post(`/contests/${id}/register`);
+                Toast.success('Registered successfully!');
+            } catch (e) {
+                Toast.error(e.message || 'Registration failed');
+            }
+        }
+    </script>
+</body>
+</html>

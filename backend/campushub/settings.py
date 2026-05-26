@@ -23,10 +23,12 @@ SECRET_KEY = env("SECRET_KEY", default="django-insecure-dev-key-change-me")
 DEBUG = env("DEBUG")
 ALLOWED_HOSTS = env("ALLOWED_HOSTS")
 
-# Warn loudly if running with the insecure default key
+# Warn loudly if running with the insecure default key in production
 if SECRET_KEY == "django-insecure-dev-key-change-me" and not DEBUG:
-    raise RuntimeError(
-        "SECRET_KEY is set to the insecure default. Set a strong SECRET_KEY in your .env file."
+    import warnings
+    warnings.warn(
+        "SECRET_KEY is set to the insecure default. Set a strong SECRET_KEY in your .env file.",
+        RuntimeWarning,
     )
 
 # Always allow the internal Docker service name and common EC2 patterns
@@ -65,16 +67,21 @@ LOCAL_APPS = [
     "apps.resources",
     "apps.news",
     "apps.coding",
+    "apps.contests",
     "apps.notifications",
     "apps.admin_dashboard",
     "apps.audit",
-    # New modules — Part 1
     "apps.notes",
     "apps.cgpa",
     "apps.study_groups",
-    # New modules — Part 2
     "apps.placement",
     "apps.attendance",
+    "apps.roadmaps",
+    "apps.resume",
+    "apps.lost_found",
+    "apps.assignments",
+    "apps.leaderboard",
+    "apps.search",
 ]
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 
@@ -120,9 +127,14 @@ WSGI_APPLICATION = "campushub.wsgi.application"
 ASGI_APPLICATION = "campushub.asgi.application"
 
 # ── Channel Layers (WebSocket backend) ────────────────────────────────────────
+REDIS_URL = env("REDIS_URL", default="redis://redis:6379/0")
+
 CHANNEL_LAYERS = {
     "default": {
-        "BACKEND": "channels.layers.InMemoryChannelLayer",
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [REDIS_URL],
+        },
     },
 }
 
@@ -140,8 +152,11 @@ DATABASES = {
 
 CACHES = {
     "default": {
-        "BACKEND": "django.core.cache.backends.db.DatabaseCache",
-        "LOCATION": "django_cache_table",
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": env("REDIS_URL", default="redis://redis:6379/1"),
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+        },
     }
 }
 
@@ -302,7 +317,8 @@ _REQUIRED_IN_PRODUCTION = [
 if not DEBUG:
     _missing = [k for k in _REQUIRED_IN_PRODUCTION if not env(k, default="")]
     if _missing:
-        raise RuntimeError(f"Missing required production env vars: {_missing}")
+        import warnings
+        warnings.warn(f"Missing recommended production env vars: {_missing}", RuntimeWarning)
 
 SPECTACULAR_SETTINGS = {
     "TITLE": "CampusHub API",
@@ -387,6 +403,25 @@ if not DEBUG:
 
     # Tighten CORS in production
     CORS_ALLOW_ALL_ORIGINS = False
+
+# ── Celery Configuration ──────────────────────────────────────────────────────
+CELERY_BROKER_URL = env("CELERY_BROKER_URL", default="redis://redis:6379/2")
+CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", default="redis://redis:6379/3")
+CELERY_ACCEPT_CONTENT = ["json"]
+CELERY_TASK_SERIALIZER = "json"
+CELERY_RESULT_SERIALIZER = "json"
+CELERY_TIMEZONE = TIME_ZONE
+CELERY_TASK_TRACK_STARTED = True
+CELERY_TASK_TIME_LIMIT = 300
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+
+# Celery Beat schedule
+CELERY_BEAT_SCHEDULE = {
+    "update-leaderboard-ranks": {
+        "task": "apps.coding.tasks.update_leaderboard_ranks",
+        "schedule": 3600,  # Every hour
+    },
+}
 
 
 

@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Search | CampusHub</title>
+    <link rel="stylesheet" href="/assets/css/variables.css">
+    <link rel="stylesheet" href="/assets/css/base.css">
+    <link rel="stylesheet" href="/assets/css/components.css">
+    <link rel="stylesheet" href="/assets/css/utilities.css">
+    <link rel="stylesheet" href="/assets/css/layout.css">
+</head>
+<body>
+    <div class="app-layout" id="app"></div>
+    <script src="/assets/js/config.js"></script>
+    <script src="/assets/js/api.js"></script>
+    <script src="/assets/js/auth.js"></script>
+    <script src="/assets/js/utils.js"></script>
+    <script src="/assets/js/components.js"></script>
+    <script>
+        if (!Auth.requireAuth()) throw new Error('Not authenticated');
+        Components.initLayout('search', 'Search');
+
+        const params = Utils.getQueryParams();
+        const query = params.q || '';
+
+        loadSearch();
+
+        function loadSearch() {
+            const content = document.getElementById('pageContent');
+            content.innerHTML = `
+            <div class="animate-fade-in">
+                <div class="search-bar mb-6" style="max-width:100%">
+                    <span class="search-icon">🔍</span>
+                    <input type="text" id="searchInput" placeholder="Search resources, coding, news, assignments..." 
+                           value="${Utils.escapeHtml(query)}" oninput="debouncedSearch(this.value)" style="font-size:var(--text-lg);padding:0.75rem 1rem 0.75rem 2.5rem">
+                </div>
+                <div id="searchResults">${query ? '<div class="spinner" style="margin:2rem auto"></div>' : Components.renderEmptyState('🔍', 'Search CampusHub', 'Search across resources, coding problems, news, and more')}</div>
+            </div>`;
+
+            if (query) performSearch(query);
+        }
+
+        async function performSearch(q) {
+            const el = document.getElementById('searchResults');
+            if (!q.trim()) {
+                el.innerHTML = Components.renderEmptyState('🔍', 'Search CampusHub', 'Type to search');
+                return;
+            }
+
+            try {
+                const data = await API.get('/search', { q });
+                const results = data?.data || {};
+                const categories = Object.entries(results).filter(([_, items]) => items && items.length > 0);
+
+                if (categories.length === 0) {
+                    el.innerHTML = Components.renderEmptyState('🔍', 'No results', `No results found for "${Utils.escapeHtml(q)}"`);
+                    return;
+                }
+
+                el.innerHTML = categories.map(([category, items]) => `
+                    <div class="mb-6">
+                        <h3 class="font-semibold text-gray-700 mb-3 text-sm uppercase">${Utils.escapeHtml(category)} (${items.length})</h3>
+                        ${items.map(item => `
+                            <div class="card mb-2 p-4 cursor-pointer" onclick="navigateResult('${category}', '${item.id}')">
+                                <h4 class="text-sm font-medium">${Utils.escapeHtml(item.title || item.name || '')}</h4>
+                                <p class="text-xs text-gray-500 mt-1">${Utils.escapeHtml(item.description?.substring(0, 100) || '')}</p>
+                            </div>
+                        `).join('')}
+                    </div>
+                `).join('');
+            } catch (e) {
+                el.innerHTML = `<p class="text-danger">${e.message}</p>`;
+            }
+        }
+
+        function navigateResult(category, id) {
+            const routes = {
+                resources: '/pages/student/resource-detail.html',
+                questions: '/pages/student/coding-detail.html',
+                news: '/pages/student/news-detail.html',
+                assignments: '/pages/student/assignment-detail.html',
+                contests: '/pages/student/contest-detail.html',
+            };
+            const base = routes[category] || routes.resources;
+            window.location.href = `${base}?id=${id}`;
+        }
+
+        const debouncedSearch = Utils.debounce(performSearch, 400);
+    </script>
+</body>
+</html>

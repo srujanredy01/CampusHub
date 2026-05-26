@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resource Uploads | CampusHub Faculty</title>
+    <link rel="stylesheet" href="/assets/css/variables.css">
+    <link rel="stylesheet" href="/assets/css/base.css">
+    <link rel="stylesheet" href="/assets/css/components.css">
+    <link rel="stylesheet" href="/assets/css/utilities.css">
+    <link rel="stylesheet" href="/assets/css/layout.css">
+</head>
+<body>
+    <div class="app-layout" id="app"></div>
+    <script src="/assets/js/config.js"></script>
+    <script src="/assets/js/api.js"></script>
+    <script src="/assets/js/auth.js"></script>
+    <script src="/assets/js/utils.js"></script>
+    <script src="/assets/js/components.js"></script>
+    <script>
+        if (!Auth.requireFaculty()) throw new Error('Not faculty');
+        Components.initLayout('resources', 'Resource Uploads');
+
+        document.getElementById('pageContent').innerHTML = `
+        <div class="animate-fade-in">
+            <div class="card mb-6">
+                <h3 class="card-title mb-4">Upload Resource</h3>
+                <form onsubmit="uploadResource(event)">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="form-group"><label class="form-label">Title</label><input type="text" id="rTitle" class="form-input" required></div>
+                        <div class="form-group"><label class="form-label">Subject</label><input type="text" id="rSubject" class="form-input"></div>
+                    </div>
+                    <div class="form-group"><label class="form-label">Description</label><textarea id="rDesc" class="form-input" rows="3"></textarea></div>
+                    <div class="form-group"><label class="form-label">File</label><input type="file" id="rFile" class="form-input" required></div>
+                    <button type="submit" class="btn btn-primary">Upload</button>
+                </form>
+            </div>
+            <div class="card">
+                <h3 class="card-title mb-4">My Uploads</h3>
+                <div id="myUploads">${Components.renderSkeleton('text', 3)}</div>
+            </div>
+        </div>`;
+
+        loadMyUploads();
+
+        async function loadMyUploads() {
+            const el = document.getElementById('myUploads');
+            try {
+                const data = await API.get('/resources');
+                const items = data?.data?.results || data?.data || [];
+                el.innerHTML = items.length === 0 ? '<p class="text-sm text-gray-500">No uploads yet</p>' :
+                    items.map(r => `<div class="flex items-center justify-between py-2 border-b" style="border-color:var(--gray-100)"><div><p class="text-sm font-medium">${Utils.escapeHtml(r.title)}</p><p class="text-xs text-gray-500">${Utils.timeAgo(r.created_at)}</p></div><span class="text-xs text-gray-400">${r.download_count || 0} downloads</span></div>`).join('');
+            } catch (e) { el.innerHTML = `<p class="text-danger">${e.message}</p>`; }
+        }
+
+        async function uploadResource(e) {
+            e.preventDefault();
+            const formData = new FormData();
+            formData.append('title', document.getElementById('rTitle').value);
+            formData.append('subject', document.getElementById('rSubject').value);
+            formData.append('description', document.getElementById('rDesc').value);
+            formData.append('file', document.getElementById('rFile').files[0]);
+            try {
+                await API.upload('/resources/upload', formData);
+                Toast.success('Uploaded!'); e.target.reset(); loadMyUploads();
+            } catch (e) { Toast.error(e.message); }
+        }
+    </script>
+</body>
+</html>

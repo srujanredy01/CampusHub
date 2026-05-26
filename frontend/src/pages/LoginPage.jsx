@@ -18,7 +18,8 @@ export default function LoginPage() {
   // Redirect already-authenticated users away from the login page
   useEffect(() => {
     if (isAuthenticated && user) {
-      navigate(user.role === "admin" ? "/admin/dashboard" : "/dashboard", { replace: true });
+      const adminRoles = ["admin", "super_admin", "moderator"];
+      navigate(adminRoles.includes(user.role) ? "/admin/dashboard" : "/dashboard", { replace: true });
     }
   }, [isAuthenticated, user, navigate]);
 

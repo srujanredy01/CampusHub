@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Announcements | CampusHub Faculty</title>
+    <link rel="stylesheet" href="/assets/css/variables.css">
+    <link rel="stylesheet" href="/assets/css/base.css">
+    <link rel="stylesheet" href="/assets/css/components.css">
+    <link rel="stylesheet" href="/assets/css/utilities.css">
+    <link rel="stylesheet" href="/assets/css/layout.css">
+</head>
+<body>
+    <div class="app-layout" id="app"></div>
+    <script src="/assets/js/config.js"></script>
+    <script src="/assets/js/api.js"></script>
+    <script src="/assets/js/auth.js"></script>
+    <script src="/assets/js/utils.js"></script>
+    <script src="/assets/js/components.js"></script>
+    <script>
+        if (!Auth.requireFaculty()) throw new Error('Not faculty');
+        Components.initLayout('announcements', 'Announcements');
+
+        document.getElementById('pageContent').innerHTML = `
+        <div class="animate-fade-in">
+            <div class="card mb-6">
+                <h3 class="card-title mb-4">Post Announcement</h3>
+                <form onsubmit="postAnnouncement(event)">
+                    <div class="form-group"><label class="form-label">Title</label><input type="text" id="nTitle" class="form-input" required placeholder="Announcement title"></div>
+                    <div class="form-group"><label class="form-label">Content</label><textarea id="nContent" class="form-input" rows="5" required placeholder="Write your announcement..."></textarea></div>
+                    <button type="submit" class="btn btn-primary">Post Announcement</button>
+                </form>
+            </div>
+            <div class="card">
+                <h3 class="card-title mb-4">Previous Announcements</h3>
+                <div id="announcements">${Components.renderSkeleton('text', 3)}</div>
+            </div>
+        </div>`;
+
+        loadAnnouncements();
+
+        async function loadAnnouncements() {
+            const el = document.getElementById('announcements');
+            try {
+                const data = await API.get('/news');
+                const items = data?.data?.results || data?.data || [];
+                el.innerHTML = items.length === 0 ? '<p class="text-sm text-gray-500">No announcements yet</p>' :
+                    items.slice(0, 10).map(n => `<div class="py-3 border-b" style="border-color:var(--gray-100)"><h4 class="text-sm font-medium">${Utils.escapeHtml(n.title)}</h4><p class="text-xs text-gray-500 mt-1">${Utils.timeAgo(n.created_at)}</p></div>`).join('');
+            } catch (e) { el.innerHTML = `<p class="text-sm text-gray-500">Unable to load</p>`; }
+        }
+
+        async function postAnnouncement(e) {
+            e.preventDefault();
+            try {
+                await API.post('/news/create', { title: document.getElementById('nTitle').value, content: document.getElementById('nContent').value });
+                Toast.success('Announcement posted!'); e.target.reset(); loadAnnouncements();
+            } catch (e) { Toast.error(e.message); }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profile | CampusHub</title>
+    <link rel="stylesheet" href="/assets/css/variables.css">
+    <link rel="stylesheet" href="/assets/css/base.css">
+    <link rel="stylesheet" href="/assets/css/components.css">
+    <link rel="stylesheet" href="/assets/css/utilities.css">
+    <link rel="stylesheet" href="/assets/css/layout.css">
+    <style>
+        .profile-header-card { background: linear-gradient(135deg, var(--primary-600), var(--purple-600)); border-radius: var(--radius-xl); padding: var(--space-8); color: #fff; position: relative; overflow: hidden; }
+        .profile-header-card::before { content: ''; position: absolute; top: -50%; right: -20%; width: 300px; height: 300px; background: rgba(255,255,255,0.1); border-radius: 50%; }
+        .profile-avatar-large { width: 100px; height: 100px; border-radius: var(--radius-full); background: rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; font-size: 2.5rem; font-weight: var(--font-bold); border: 3px solid rgba(255,255,255,0.5); }
+        .profile-info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-4); }
+        .profile-info-item { padding: var(--space-4); background: var(--gray-50); border-radius: var(--radius-lg); }
+        .profile-info-label { font-size: var(--text-xs); color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: var(--space-1); }
+        .profile-info-value { font-size: var(--text-sm); font-weight: var(--font-semibold); color: var(--gray-900); }
+        .coding-links { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+        .coding-link { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-4); background: var(--gray-50); border-radius: var(--radius-lg); font-size: var(--text-sm); color: var(--gray-700); border: 1px solid var(--gray-200); transition: all var(--transition-fast); }
+        .coding-link:hover { border-color: var(--primary-300); background: var(--primary-50); }
+    </style>
+</head>
+<body>
+    <div class="app-layout" id="app"></div>
+
+    <script src="/assets/js/config.js"></script>
+    <script src="/assets/js/api.js"></script>
+    <script src="/assets/js/auth.js"></script>
+    <script src="/assets/js/utils.js"></script>
+    <script src="/assets/js/components.js"></script>
+    <script>
+        if (!Auth.requireAuth()) throw new Error('Not authenticated');
+        Components.initLayout('profile', 'Profile');
+        loadProfile();
+
+        async function loadProfile() {
+            const content = document.getElementById('pageContent');
+            const user = Auth.getUser();
+
+            try {
+                const [profileData, leaderboardData, attendanceData, assignmentsData] = await Promise.allSettled([
+                    API.get('/profile'),
+                    API.get('/leaderboard/me'),
+                    API.get('/attendance/summary'),
+                    API.get('/assignments/my'),
+                ]);
+
+                const profile = profileData.status === 'fulfilled' ? profileData.value?.data : user;
+                const lb = leaderboardData.status === 'fulfilled' ? leaderboardData.value?.data : {};
+                const att = attendanceData.status === 'fulfilled' ? attendanceData.value?.data : {};
+                const assignments = assignmentsData.status === 'fulfilled' ? (assignmentsData.value?.data || []) : [];
+
+                const pending = assignments.filter(a => a.status === 'pending').length;
+                const submitted = assignments.filter(a => a.status === 'submitted').length;
+                const graded = assignments.filter(a => a.status === 'graded').length;
+
+                content.innerHTML = `
+                <div class="animate-fade-in">
+                    <!-- Profile Header -->
+                    <div class="profile-header-card mb-6">
+                        <div class="flex items-center gap-6 flex-wrap">
+                            <div class="profile-avatar-large">${Utils.getInitials(profile?.full_name)}</div>
+                            <div>
+                                <h2 class="text-2xl font-bold" style="color:#fff">${Utils.escapeHtml(profile?.full_name || '')}</h2>
+                                <p style="opacity:0.9">${Utils.escapeHtml(profile?.student_id || '')} • ${Utils.escapeHtml(profile?.branch || '')} • Section ${Utils.escapeHtml(profile?.section || '—')}</p>
+                                <p style="opacity:0.8; font-size:var(--text-sm)">Batch ${Utils.escapeHtml(profile?.batch || '—')} • Semester ${profile?.semester || '—'}</p>
+                            </div>
+                            <div class="ml-auto hide-mobile">
+                                <a href="/pages/student/settings.html" class="btn btn-secondary">⚙️ Edit Profile</a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Info Grid -->
+                    <div class="grid grid-cols-2 gap-6 mb-6">
+                        <!-- Personal Info -->
+                        <div class="card">
+                            <h3 class="card-title mb-4">📋 Personal Information</h3>
+                            <div class="profile-info-grid">
+                                <div class="profile-info-item">
+                                    <div class="profile-info-label">Email</div>
+                                    <div class="profile-info-value">${Utils.escapeHtml(profile?.email || '—')}</div>
+                                </div>
+                                <div class="profile-info-item">
+                                    <div class="profile-info-label">Phone</div>
+                                    <div class="profile-info-value">${Utils.escapeHtml(profile?.phone || '—')}</div>
+                                </div>
+                                <div class="profile-info-item">
+                                    <div class="profile-info-label">Branch</div>
+                                    <div class="profile-info-value">${Utils.escapeHtml(profile?.branch || '—')}</div>
+                                </div>
+                                <div class="profile-info-item">
+                                    <div class="profile-info-label">Semester</div>
+                                    <div class="profile-info-value">${profile?.semester || '—'}</div>
+                                </div>
+                                <div class="profile-info-item">
+                                    <div class="profile-info-label">Section</div>
+                                    <div class="profile-info-value">${Utils.escapeHtml(profile?.section || '—')}</div>
+                                </div>
+                                <div class="profile-info-item">
+                                    <div class="profile-info-label">Batch</div>
+                                    <div class="profile-info-value">${Utils.escapeHtml(profile?.batch || '—')}</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Academic & Career -->
+                        <div class="card">
+                            <h3 class="card-title mb-4">🎓 Academic & Career</h3>
+                            <div class="profile-info-grid">
+                                <div class="profile-info-item">
+                                    <div class="profile-info-label">Attendance</div>
+                                    <div class="profile-info-value">${att?.overall_percentage || 0}%</div>
+                                </div>
+                                <div class="profile-info-item">
+                                    <div class="profile-info-label">Coding Rank</div>
+                                    <div class="profile-info-value">#${lb?.rank || '—'}</div>
+                                </div>
+                                <div class="profile-info-item">
+                                    <div class="profile-info-label">Total XP</div>
+                                    <div class="profile-info-value">${lb?.total_xp || 0}</div>
+                                </div>
+                                <div class="profile-info-item">
+                                    <div class="profile-info-label">Problems Solved</div>
+                                    <div class="profile-info-value">${lb?.problems_solved || 0}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Assignments & Coding Links -->
+                    <div class="grid grid-cols-2 gap-6">
+                        <!-- Assignments Summary -->
+                        <div class="card">
+                            <h3 class="card-title mb-4">📝 Assignments</h3>
+                            <div class="flex gap-6">
+                                <div class="text-center">
+                                    <p class="text-2xl font-bold text-warning">${pending}</p>
+                                    <p class="text-xs text-gray-500">Pending</p>
+                                </div>
+                                <div class="text-center">
+                                    <p class="text-2xl font-bold text-primary">${submitted}</p>
+                                    <p class="text-xs text-gray-500">Submitted</p>
+                                </div>
+                                <div class="text-center">
+                                    <p class="text-2xl font-bold text-success">${graded}</p>
+                                    <p class="text-xs text-gray-500">Graded</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Coding Links -->
+                        <div class="card">
+                            <h3 class="card-title mb-4">🔗 Coding Profiles</h3>
+                            <div class="coding-links">
+                                <a href="#" class="coding-link">🐙 GitHub</a>
+                                <a href="#" class="coding-link">🟡 LeetCode</a>
+                                <a href="#" class="coding-link">🟢 HackerRank</a>
+                                <a href="#" class="coding-link">⭐ CodeChef</a>
+                                <a href="#" class="coding-link">💼 LinkedIn</a>
+                            </div>
+                            <p class="text-xs text-gray-400 mt-3">Configure links in Settings</p>
+                        </div>
+                    </div>
+                </div>`;
+            } catch (e) {
+                content.innerHTML = `<p class="text-danger">Failed to load profile. ${e.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>

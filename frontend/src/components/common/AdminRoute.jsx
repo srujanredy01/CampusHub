@@ -6,6 +6,8 @@ export default function AdminRoute() {
   const { isAuthenticated, isInitialized, user } = useSelector((s) => s.auth);
   if (!isInitialized) return null;
   if (!isAuthenticated) return <Navigate to="/login" replace />;
-  if (user?.role !== "admin") return <Navigate to="/dashboard" replace />;
+  // Allow super_admin, admin, and moderator roles
+  const adminRoles = ["super_admin", "admin", "moderator"];
+  if (!adminRoles.includes(user?.role)) return <Navigate to="/dashboard" replace />;
   return <Outlet />;
 }

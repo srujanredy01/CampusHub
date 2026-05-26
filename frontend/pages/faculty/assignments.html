@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Assignment Management | CampusHub Faculty</title>
+    <link rel="stylesheet" href="/assets/css/variables.css">
+    <link rel="stylesheet" href="/assets/css/base.css">
+    <link rel="stylesheet" href="/assets/css/components.css">
+    <link rel="stylesheet" href="/assets/css/utilities.css">
+    <link rel="stylesheet" href="/assets/css/layout.css">
+</head>
+<body>
+    <div class="app-layout" id="app"></div>
+    <script src="/assets/js/config.js"></script>
+    <script src="/assets/js/api.js"></script>
+    <script src="/assets/js/auth.js"></script>
+    <script src="/assets/js/utils.js"></script>
+    <script src="/assets/js/components.js"></script>
+    <script>
+        if (!Auth.requireFaculty()) throw new Error('Not faculty');
+        Components.initLayout('assignments', 'Assignment Management');
+
+        const content = document.getElementById('pageContent');
+        content.innerHTML = `
+        <div class="animate-fade-in">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-xl font-bold">My Assignments</h2>
+                <button class="btn btn-primary" onclick="Components.openModal('createModal')">+ Create Assignment</button>
+            </div>
+            <div class="card"><div id="assignList">${Components.renderSkeleton('table')}</div></div>
+        </div>
+        <div class="modal-overlay" id="createModal" onclick="if(event.target===this)Components.closeModal('createModal')">
+            <div class="modal" style="max-width:600px">
+                <div class="modal-header"><h3 class="modal-title">Create Assignment</h3><button class="modal-close" onclick="Components.closeModal('createModal')">✕</button></div>
+                <div class="modal-body">
+                    <form onsubmit="createAssignment(event)">
+                        <div class="form-group"><label class="form-label">Title</label><input type="text" id="aTitle" class="form-input" required></div>
+                        <div class="form-group"><label class="form-label">Subject</label><input type="text" id="aSubject" class="form-input"></div>
+                        <div class="form-group"><label class="form-label">Description</label><textarea id="aDesc" class="form-input" rows="4"></textarea></div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="form-group"><label class="form-label">Due Date</label><input type="datetime-local" id="aDue" class="form-input" required></div>
+                            <div class="form-group"><label class="form-label">Max Grade</label><input type="number" id="aGrade" class="form-input" value="100"></div>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-full">Create</button>
+                    </form>
+                </div>
+            </div>
+        </div>`;
+
+        loadAssignments();
+
+        async function loadAssignments() {
+            const el = document.getElementById('assignList');
+            try {
+                const data = await API.get('/assignments');
+                const items = data?.data?.results || data?.data || [];
+                el.innerHTML = items.length === 0 ? Components.renderEmptyState('📝', 'No assignments', 'Create your first assignment') : `
+                <div class="table-container"><table class="data-table">
+                    <thead><tr><th>Title</th><th>Subject</th><th>Due</th><th>Submissions</th></tr></thead>
+                    <tbody>${items.map(a => `<tr><td class="font-medium">${Utils.escapeHtml(a.title)}</td><td>${Utils.escapeHtml(a.subject || '—')}</td><td>${Utils.formatDate(a.due_date)}</td><td>${a.submission_count || 0}</td></tr>`).join('')}</tbody>
+                </table></div>`;
+            } catch (e) { el.innerHTML = `<p class="text-danger">${e.message}</p>`; }
+        }
+
+        async function createAssignment(e) {
+            e.preventDefault();
+            try {
+                await API.post('/admin/assignments', { title: document.getElementById('aTitle').value, subject: document.getElementById('aSubject').value, description: document.getElementById('aDesc').value, due_date: document.getElementById('aDue').value, max_grade: parseInt(document.getElementById('aGrade').value) });
+                Toast.success('Created!'); Components.closeModal('createModal'); loadAssignments();
+            } catch (e) { Toast.error(e.message); }
+        }
+    </script>
+</body>
+</html>

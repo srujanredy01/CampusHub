@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resources Management | CampusHub Admin</title>
+    <link rel="stylesheet" href="/assets/css/variables.css">
+    <link rel="stylesheet" href="/assets/css/base.css">
+    <link rel="stylesheet" href="/assets/css/components.css">
+    <link rel="stylesheet" href="/assets/css/utilities.css">
+    <link rel="stylesheet" href="/assets/css/layout.css">
+</head>
+<body>
+    <div class="app-layout" id="app"></div>
+    <script src="/assets/js/config.js"></script>
+    <script src="/assets/js/api.js"></script>
+    <script src="/assets/js/auth.js"></script>
+    <script src="/assets/js/utils.js"></script>
+    <script src="/assets/js/components.js"></script>
+    <script>
+        if (!Auth.requireAdmin()) throw new Error('Not admin');
+        Components.initLayout('resources', 'Resources Management');
+        loadAdminResources();
+
+        async function loadAdminResources() {
+            const content = document.getElementById('pageContent');
+            content.innerHTML = `
+            <div class="animate-fade-in">
+                <div class="flex items-center justify-between mb-6">
+                    <div class="search-bar"><span class="search-icon">🔍</span><input type="text" placeholder="Search resources..." oninput="debouncedSearch(this.value)"></div>
+                    <button class="btn btn-primary" onclick="showUploadModal()">+ Upload Resource</button>
+                </div>
+                <div class="card"><div id="resourcesTable">${Components.renderSkeleton('table')}</div></div>
+            </div>
+
+            <div class="modal-overlay" id="uploadModal" onclick="if(event.target===this)Components.closeModal('uploadModal')">
+                <div class="modal">
+                    <div class="modal-header"><h3 class="modal-title">Upload Resource</h3><button class="modal-close" onclick="Components.closeModal('uploadModal')">✕</button></div>
+                    <div class="modal-body">
+                        <form onsubmit="uploadResource(event)">
+                            <div class="form-group"><label class="form-label">Title</label><input type="text" id="rTitle" class="form-input" required></div>
+                            <div class="form-group"><label class="form-label">Subject</label><input type="text" id="rSubject" class="form-input"></div>
+                            <div class="form-group"><label class="form-label">Description</label><textarea id="rDesc" class="form-input" rows="3"></textarea></div>
+                            <div class="form-group"><label class="form-label">File</label><input type="file" id="rFile" class="form-input" required></div>
+                            <div id="uploadProgress" style="display:none" class="mb-4"><div class="progress-bar"><div class="progress-fill" id="progressBar" style="width:0%"></div></div><p class="text-xs text-gray-500 mt-1" id="progressText">0%</p></div>
+                            <button type="submit" class="btn btn-primary w-full" id="uploadBtn">Upload</button>
+                        </form>
+                    </div>
+                </div>
+            </div>`;
+            fetchResources();
+        }
+
+        async function fetchResources(search = '') {
+            const el = document.getElementById('resourcesTable');
+            try {
+                const params = {};
+                if (search) params.search = search;
+                const data = await API.get('/admin/resources', params);
+                const resources = data?.data?.results || data?.data || [];
+
+                el.innerHTML = `
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead><tr><th>Title</th><th>Subject</th><th>Type</th><th>Downloads</th><th>Status</th><th>Actions</th></tr></thead>
+                        <tbody>
+                            ${resources.map(r => `
+                                <tr>
+                                    <td class="font-medium">${Utils.escapeHtml(r.title)}</td>
+                                    <td>${Utils.escapeHtml(r.subject || '—')}</td>
+                                    <td><span class="badge badge-gray">${r.file_type || '—'}</span></td>
+                                    <td>${r.download_count || 0}</td>
+                                    <td><span class="badge badge-${r.is_active ? 'success' : 'gray'}">${r.is_active ? 'Active' : 'Inactive'}</span></td>
+                                    <td>
+                                        <button class="btn btn-ghost btn-sm" onclick="toggleResource('${r.id}')">${r.is_active ? 'Disable' : 'Enable'}</button>
+                                        <button class="btn btn-ghost btn-sm text-danger" onclick="deleteResource('${r.id}')">Delete</button>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>`;
+            } catch (e) { el.innerHTML = `<p class="text-danger">${e.message}</p>`; }
+        }
+
+        function showUploadModal() { Components.openModal('uploadModal'); }
+
+        async function uploadResource(e) {
+            e.preventDefault();
+            const btn = document.getElementById('uploadBtn');
+            btn.disabled = true;
+            document.getElementById('uploadProgress').style.display = 'block';
+
+            const formData = new FormData();
+            formData.append('title', document.getElementById('rTitle').value);
+            formData.append('subject', document.getElementById('rSubject').value);
+            formData.append('description', document.getElementById('rDesc').value);
+            formData.append('file', document.getElementById('rFile').files[0]);
+
+            try {
+                await API.upload('/admin/resources/upload', formData, (pct) => {
+                    document.getElementById('progressBar').style.width = pct + '%';
+                    document.getElementById('progressText').textContent = pct + '%';
+                });
+                Toast.success('Resource uploaded!');
+                Components.closeModal('uploadModal');
+                fetchResources();
+            } catch (e) { Toast.error(e.message); }
+            finally { btn.disabled = false; }
+        }
+
+        async function toggleResource(id) { try { await API.post(`/admin/resources/${id}/toggle`); fetchResources(); } catch(e) { Toast.error(e.message); } }
+        async function deleteResource(id) { Components.confirm('Delete this resource?', async () => { try { await API.delete(`/admin/resources/${id}`); Toast.success('Deleted'); fetchResources(); } catch(e) { Toast.error(e.message); } }); }
+        const debouncedSearch = Utils.debounce(fetchResources, 400);
+    </script>
+</body>
+</html>

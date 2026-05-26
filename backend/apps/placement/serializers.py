@@ -1,50 +1,32 @@
 from django.utils import timezone
 from rest_framework import serializers
-from .models import Company, PlacementApplication, InterviewRound
+from .models import PlacementApplication, InterviewExperience, CompanyNote
 
 
-ACTIVE_APPLICATION_STATUSES = {"applied", "shortlisted", "interview"}
-
-
-class CompanySerializer(serializers.ModelSerializer):
+class InterviewExperienceSerializer(serializers.ModelSerializer):
     class Meta:
-        model = Company
-        fields = ["id", "name", "website", "logo_url", "industry", "is_active", "created_at", "updated_at"]
-        read_only_fields = ["id", "created_at", "updated_at"]
-
-    def validate_name(self, value):
-        value = value.strip()
-        if len(value) < 2:
-            raise serializers.ValidationError("Company name must be at least 2 characters.")
-        return value
-
-
-class InterviewRoundSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = InterviewRound
-        fields = ["id", "round_number", "round_type", "round_date", "result", "feedback", "created_at"]
+        model = InterviewExperience
+        fields = [
+            "id", "round_type", "round_number", "interview_date",
+            "result", "questions_asked", "experience_notes",
+            "difficulty", "duration_minutes", "created_at",
+        ]
         read_only_fields = ["id", "created_at"]
-
-    def validate_round_number(self, value):
-        if value < 1 or value > 20:
-            raise serializers.ValidationError("Round number must be between 1 and 20.")
-        return value
 
 
 class PlacementApplicationSerializer(serializers.ModelSerializer):
-    company_name = serializers.CharField(source="company.name", read_only=True)
-    rounds = InterviewRoundSerializer(many=True, read_only=True)
+    interviews = InterviewExperienceSerializer(many=True, read_only=True)
     days_left = serializers.SerializerMethodField()
 
     class Meta:
         model = PlacementApplication
         fields = [
-            "id", "company", "company_name", "role", "status",
-            "package_lpa", "applied_date", "deadline", "days_left",
-            "reminder_enabled", "offer_received_at", "rejection_reason", "notes",
-            "rounds", "created_at", "updated_at",
+            "id", "company_name", "role", "package_lpa", "status",
+            "application_date", "deadline", "days_left", "job_link",
+            "location", "job_type", "notes", "offer_received_at",
+            "rejection_reason", "interviews", "created_at", "updated_at",
         ]
-        read_only_fields = ["id", "created_at", "updated_at", "days_left"]
+        read_only_fields = ["id", "created_at", "updated_at"]
 
     def get_days_left(self, obj):
         if not obj.deadline:
@@ -56,24 +38,48 @@ class PlacementApplicationCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = PlacementApplication
         fields = [
-            "company", "role", "status", "package_lpa", "applied_date", "deadline",
-            "reminder_enabled", "offer_received_at", "rejection_reason", "notes",
+            "company_name", "role", "package_lpa", "status",
+            "application_date", "deadline", "job_link", "location",
+            "job_type", "notes", "offer_received_at", "rejection_reason",
         ]
 
-    def validate(self, attrs):
-        status = attrs.get("status", getattr(self.instance, "status", "applied"))
-        offer_date = attrs.get("offer_received_at", getattr(self.instance, "offer_received_at", None))
-        rejection_reason = attrs.get("rejection_reason", getattr(self.instance, "rejection_reason", ""))
-        applied_date = attrs.get("applied_date", getattr(self.instance, "applied_date", None))
-        deadline = attrs.get("deadline", getattr(self.instance, "deadline", None))
-        package_lpa = attrs.get("package_lpa", getattr(self.instance, "package_lpa", None))
+    def validate_company_name(self, value):
+        if len(value.strip()) < 2:
+            raise serializers.ValidationError("Company name must be at least 2 characters.")
+        return value.strip()
 
-        if deadline and applied_date and deadline < applied_date:
-            raise serializers.ValidationError("Deadline cannot be earlier than applied date.")
-        if package_lpa is not None and package_lpa < 0:
+    def validate_package_lpa(self, value):
+        if value is not None and value < 0:
             raise serializers.ValidationError("Package must be non-negative.")
-        if status in {"offer", "accepted"} and not offer_date:
+        return value
+
+    def validate(self, attrs):
+        deadline = attrs.get("deadline")
+        application_date = attrs.get("application_date")
+        if deadline and application_date and deadline < application_date:
+            raise serializers.ValidationError("Deadline cannot be earlier than application date.")
+        status_val = attrs.get("status", "wishlist")
+        if status_val == "offer_received" and not attrs.get("offer_received_at"):
             attrs["offer_received_at"] = timezone.now().date()
-        if status == "rejected" and not rejection_reason:
-            raise serializers.ValidationError("Rejection reason is required when status is rejected.")
         return attrs
+
+
+class CompanyNoteSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CompanyNote
+        fields = [
+            "id", "company_name", "notes", "salary_info",
+            "interview_tips", "saved_questions", "created_at", "updated_at",
+        ]
+        read_only_fields = ["id", "created_at", "updated_at"]
+
+
+class PlacementReadinessSerializer(serializers.Serializer):
+    """Calculates placement readiness score."""
+    resume_completion = serializers.IntegerField()
+    coding_solved = serializers.IntegerField()
+    roadmap_progress = serializers.IntegerField()
+    profile_completion = serializers.IntegerField()
+    contests_participated = serializers.IntegerField()
+    assignments_completed = serializers.IntegerField()
+    overall_score = serializers.IntegerField()

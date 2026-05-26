@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Assignment Detail | CampusHub</title>
+    <link rel="stylesheet" href="/assets/css/variables.css">
+    <link rel="stylesheet" href="/assets/css/base.css">
+    <link rel="stylesheet" href="/assets/css/components.css">
+    <link rel="stylesheet" href="/assets/css/utilities.css">
+    <link rel="stylesheet" href="/assets/css/layout.css">
+</head>
+<body>
+    <div class="app-layout" id="app"></div>
+    <script src="/assets/js/config.js"></script>
+    <script src="/assets/js/api.js"></script>
+    <script src="/assets/js/auth.js"></script>
+    <script src="/assets/js/utils.js"></script>
+    <script src="/assets/js/components.js"></script>
+    <script>
+        if (!Auth.requireAuth()) throw new Error('Not authenticated');
+        Components.initLayout('assignments', 'Assignment Detail');
+
+        const params = Utils.getQueryParams();
+        loadAssignment(params.id);
+
+        async function loadAssignment(id) {
+            const content = document.getElementById('pageContent');
+            if (!id) { content.innerHTML = '<p class="text-danger">No assignment ID</p>'; return; }
+
+            try {
+                const data = await API.get(`/assignments/${id}`);
+                const a = data?.data || data;
+                Utils.setPageTitle(a.title);
+
+                content.innerHTML = `
+                <div class="animate-fade-in">
+                    <a href="/pages/student/assignments.html" class="btn btn-ghost btn-sm mb-4">← Back</a>
+                    <div class="card mb-6">
+                        <div class="flex items-start justify-between mb-4">
+                            <div>
+                                <h2 class="text-xl font-bold">${Utils.escapeHtml(a.title)}</h2>
+                                <p class="text-sm text-gray-500 mt-1">${Utils.escapeHtml(a.subject || '')} • Due: ${Utils.formatDateTime(a.due_date)}</p>
+                            </div>
+                            <span class="badge badge-${Utils.getStatusColor(a.status || 'pending')}">${a.status || 'Pending'}</span>
+                        </div>
+                        <div class="text-sm text-gray-700 mb-6">${a.description || 'No description provided.'}</div>
+                        ${a.attachments?.length ? `
+                            <div class="mb-4">
+                                <h4 class="font-semibold text-sm mb-2">Attachments</h4>
+                                ${a.attachments.map(att => `<a href="${att.url}" class="btn btn-ghost btn-sm" target="_blank">📎 ${Utils.escapeHtml(att.name)}</a>`).join('')}
+                            </div>
+                        ` : ''}
+                    </div>
+
+                    <!-- Submission Form -->
+                    <div class="card" id="submissionCard">
+                        <h3 class="card-title mb-4">Submit Assignment</h3>
+                        <form onsubmit="submitAssignment(event, '${id}')">
+                            <div class="form-group">
+                                <label class="form-label">Your Answer / Notes</label>
+                                <textarea class="form-input" id="submissionText" rows="5" placeholder="Write your answer or notes here..."></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Attach File (optional)</label>
+                                <input type="file" id="submissionFile" class="form-input">
+                            </div>
+                            <button type="submit" class="btn btn-primary" id="submitBtn">Submit Assignment</button>
+                        </form>
+                    </div>
+                </div>`;
+            } catch (e) {
+                content.innerHTML = `<p class="text-danger">Failed to load: ${e.message}</p>`;
+            }
+        }
+
+        async function submitAssignment(e, id) {
+            e.preventDefault();
+            const btn = document.getElementById('submitBtn');
+            btn.disabled = true;
+            btn.textContent = 'Submitting...';
+
+            const formData = new FormData();
+            const text = document.getElementById('submissionText').value;
+            const file = document.getElementById('submissionFile').files[0];
+
+            if (text) formData.append('content', text);
+            if (file) formData.append('file', file);
+
+            try {
+                await API.upload(`/assignments/${id}/submit`, formData);
+                Toast.success('Assignment submitted successfully!');
+                setTimeout(() => window.location.href = '/pages/student/assignments.html', 1500);
+            } catch (e) {
+                Toast.error(e.message || 'Submission failed');
+                btn.disabled = false;
+                btn.textContent = 'Submit Assignment';
+            }
+        }
+    </script>
+</body>
+</html>

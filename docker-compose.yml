@@ -1,11 +1,8 @@
 # ─────────────────────────────────────────────────────────────────────────────
 #  CampusHub — Local Development Docker Compose
-#  Run:  docker compose --env-file ./backend/.env up --build
-#  API:  http://localhost:8000/api/docs/
-#  App:  http://localhost  (Nginx → React + Django)
-#
-#  With monitoring:
-#    docker compose -f docker-compose.yml -f docker-compose.monitoring.yml --env-file ./backend/.env up --build
+#  Run:  docker compose up --build
+#  App:  http://localhost
+#  API:  http://localhost/api/docs/
 # ─────────────────────────────────────────────────────────────────────────────
 
 services:
@@ -26,13 +23,28 @@ services:
       - "5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U campushub_user -d campushub"]
-      interval: 10s
+      interval: 5s
       timeout: 5s
       retries: 5
     networks:
       - campushub_net
 
-  # ── Django Backend (ASGI with Daphne for WebSocket support) ─────────────────
+  # ── Redis ───────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: campushub_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - campushub_net
+
+  # ── Django Backend ──────────────────────────────────────────────────────────
   backend:
     build:
       context: ./backend
@@ -42,7 +54,10 @@ services:
     env_file:
       - ./backend/.env
     environment:
-      DB_HOST: db
+      - DB_HOST=db
+      - DB_PORT=5432
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/2
     volumes:
       - ./backend:/app
       - static_files:/app/staticfiles
@@ -52,12 +67,39 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     command: >
       sh -c "python manage.py migrate --noinput &&
-             python manage.py createcachetable 2>/dev/null;
              python manage.py collectstatic --noinput --clear &&
-             python manage.py create_admin --noinput &&
+             python manage.py create_admin --noinput 2>/dev/null;
              daphne -b 0.0.0.0 -p 8000 campushub.asgi:application"
+    networks:
+      - campushub_net
+
+  # ── Celery Worker ───────────────────────────────────────────────────────────
+  celery:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: campushub_celery
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    environment:
+      - DB_HOST=db
+      - DB_PORT=5432
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/2
+      - CELERY_RESULT_BACKEND=redis://redis:6379/3
+    volumes:
+      - ./backend:/app
+    command: celery -A campushub worker --loglevel=info --concurrency=2
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - campushub_net
 
@@ -68,18 +110,14 @@ services:
       dockerfile: Dockerfile
     container_name: campushub_executor
     restart: unless-stopped
-    environment:
-      EXECUTOR_WORK_DIR: /executor_work
-      EXECUTOR_VOLUME_NAME: campushub_executor_work
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - executor_work:/executor_work
     ports:
       - "8001:8001"
     networks:
       - campushub_net
 
-  # ── React Frontend ──────────────────────────────────────────────────────────
+  # ── Static Frontend ──────────────────────────────────────────────────────────
   frontend:
     build:
       context: ./frontend
@@ -110,7 +148,6 @@ volumes:
   postgres_data:
   static_files:
   media_files:
-  executor_work:
 
 networks:
   campushub_net:

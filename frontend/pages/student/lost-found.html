@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lost & Found | CampusHub</title>
+    <link rel="stylesheet" href="/assets/css/variables.css">
+    <link rel="stylesheet" href="/assets/css/base.css">
+    <link rel="stylesheet" href="/assets/css/components.css">
+    <link rel="stylesheet" href="/assets/css/utilities.css">
+    <link rel="stylesheet" href="/assets/css/layout.css">
+</head>
+<body>
+    <div class="app-layout" id="app"></div>
+    <script src="/assets/js/config.js"></script>
+    <script src="/assets/js/api.js"></script>
+    <script src="/assets/js/auth.js"></script>
+    <script src="/assets/js/utils.js"></script>
+    <script src="/assets/js/components.js"></script>
+    <script>
+        if (!Auth.requireAuth()) throw new Error('Not authenticated');
+        Components.initLayout('lost-found', 'Lost & Found');
+        loadLostFound();
+
+        async function loadLostFound() {
+            const content = document.getElementById('pageContent');
+            content.innerHTML = `
+            <div class="animate-fade-in">
+                <div class="flex items-center justify-between mb-6">
+                    <div class="search-bar"><span class="search-icon">🔍</span><input type="text" placeholder="Search items..." oninput="debouncedSearch(this.value)"></div>
+                    <button class="btn btn-primary" onclick="showPostModal()">+ Report Item</button>
+                </div>
+                <div class="filter-chips mb-4">
+                    <button class="chip active" onclick="filterItems('all', this)">All</button>
+                    <button class="chip" onclick="filterItems('lost', this)">Lost</button>
+                    <button class="chip" onclick="filterItems('found', this)">Found</button>
+                    <button class="chip" onclick="filterItems('resolved', this)">Resolved</button>
+                </div>
+                <div class="grid grid-cols-3 gap-4" id="itemsGrid">${Components.renderSkeleton('card', 6)}</div>
+            </div>
+
+            <!-- Post Modal -->
+            <div class="modal-overlay" id="postModal" onclick="if(event.target===this)Components.closeModal('postModal')">
+                <div class="modal">
+                    <div class="modal-header"><h3 class="modal-title">Report Item</h3><button class="modal-close" onclick="Components.closeModal('postModal')">✕</button></div>
+                    <div class="modal-body">
+                        <form onsubmit="postItem(event)">
+                            <div class="form-group"><label class="form-label">Type</label><select id="itemType" class="form-input"><option value="lost">Lost</option><option value="found">Found</option></select></div>
+                            <div class="form-group"><label class="form-label">Title</label><input type="text" id="itemTitle" class="form-input" required placeholder="Blue backpack"></div>
+                            <div class="form-group"><label class="form-label">Description</label><textarea id="itemDesc" class="form-input" rows="3" placeholder="Details about the item..."></textarea></div>
+                            <div class="form-group"><label class="form-label">Location</label><input type="text" id="itemLocation" class="form-input" placeholder="Library, Block A..."></div>
+                            <div class="form-group"><label class="form-label">Image</label><input type="file" id="itemImage" class="form-input" accept="image/*"></div>
+                            <button type="submit" class="btn btn-primary w-full">Post</button>
+                        </form>
+                    </div>
+                </div>
+            </div>`;
+
+            fetchItems();
+        }
+
+        let allItems = [];
+        let currentFilter = 'all';
+
+        async function fetchItems(search = '') {
+            const grid = document.getElementById('itemsGrid');
+            try {
+                const params = {};
+                if (search) params.search = search;
+                const data = await API.get('/lost-found', params);
+                allItems = data?.data?.results || data?.data || [];
+                renderItems();
+            } catch (e) { grid.innerHTML = `<p class="text-danger">${e.message}</p>`; }
+        }
+
+        function renderItems() {
+            const grid = document.getElementById('itemsGrid');
+            let items = allItems;
+            if (currentFilter !== 'all') items = items.filter(i => i.item_type === currentFilter || i.status === currentFilter);
+
+            if (items.length === 0) {
+                grid.innerHTML = Components.renderEmptyState('🔍', 'No items found', 'No items match your criteria');
+                return;
+            }
+
+            grid.innerHTML = items.map(item => `
+                <div class="card">
+                    ${item.image ? `<img src="${item.image}" style="width:100%;height:120px;object-fit:cover;border-radius:var(--radius-md);margin-bottom:var(--space-3)" alt="">` : ''}
+                    <div class="flex items-center gap-2 mb-2">
+                        <span class="badge badge-${item.item_type === 'lost' ? 'danger' : 'success'}">${item.item_type === 'lost' ? '🔴 Lost' : '🟢 Found'}</span>
+                        ${item.status === 'resolved' ? '<span class="badge badge-gray">Resolved</span>' : ''}
+                    </div>
+                    <h4 class="font-semibold text-sm">${Utils.escapeHtml(item.title)}</h4>
+                    <p class="text-xs text-gray-500 mt-1">${Utils.escapeHtml(item.location || '')}</p>
+                    <p class="text-xs text-gray-400 mt-2">${Utils.timeAgo(item.created_at)}</p>
+                </div>
+            `).join('');
+        }
+
+        function filterItems(filter, btn) {
+            currentFilter = filter;
+            document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+            btn.classList.add('active');
+            renderItems();
+        }
+
+        function showPostModal() { Components.openModal('postModal'); }
+
+        async function postItem(e) {
+            e.preventDefault();
+            const formData = new FormData();
+            formData.append('item_type', document.getElementById('itemType').value);
+            formData.append('title', document.getElementById('itemTitle').value);
+            formData.append('description', document.getElementById('itemDesc').value);
+            formData.append('location', document.getElementById('itemLocation').value);
+            const file = document.getElementById('itemImage').files[0];
+            if (file) formData.append('image', file);
+
+            try {
+                await API.upload('/lost-found/create', formData);
+                Toast.success('Item posted!');
+                Components.closeModal('postModal');
+                fetchItems();
+            } catch (e) { Toast.error(e.message); }
+        }
+
+        const debouncedSearch = Utils.debounce((v) => fetchItems(v), 400);
+    </script>
+</body>
+</html>

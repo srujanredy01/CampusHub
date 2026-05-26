@@ -55,6 +55,15 @@ urlpatterns = [
     path("api/placement/",     include("apps.placement.urls")),
     path("api/attendance/",    include("apps.attendance.urls")),
 
+    # ── New modules — Part 3 ───────────────────────────────────────────────
+    path("api/roadmaps/",      include("apps.roadmaps.urls")),
+    path("api/resume/",        include("apps.resume.urls")),
+    path("api/lost-found/",    include("apps.lost_found.urls")),
+    path("api/assignments/",   include("apps.assignments.urls")),
+    path("api/leaderboard/",   include("apps.leaderboard.urls")),
+    path("api/search/",        include("apps.search.urls")),
+    path("api/contests/",      include("apps.contests.urls")),
+
     # ── Docs & Metrics ─────────────────────────────────────────────────────
     path("api/schema/",        SpectacularAPIView.as_view(),                        name="schema"),
     path("api/docs/",          SpectacularSwaggerView.as_view(url_name="schema"),   name="swagger-ui"),

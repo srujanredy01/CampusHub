@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Placement Tracker | CampusHub</title>
+    <link rel="stylesheet" href="/assets/css/variables.css">
+    <link rel="stylesheet" href="/assets/css/base.css">
+    <link rel="stylesheet" href="/assets/css/components.css">
+    <link rel="stylesheet" href="/assets/css/utilities.css">
+    <link rel="stylesheet" href="/assets/css/layout.css">
+    <style>
+        .kanban-board { display: flex; gap: var(--space-4); overflow-x: auto; padding-bottom: var(--space-4); }
+        .kanban-column { min-width: 250px; background: var(--gray-50); border-radius: var(--radius-lg); padding: var(--space-3); }
+        .kanban-column-title { font-size: var(--text-xs); font-weight: var(--font-semibold); text-transform: uppercase; color: var(--gray-500); padding: var(--space-2); letter-spacing: 0.05em; }
+        .kanban-card { background: var(--surface-card); border-radius: var(--radius-md); padding: var(--space-3); margin-top: var(--space-2); border: 1px solid var(--gray-200); cursor: pointer; transition: all var(--transition-fast); }
+        .kanban-card:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
+    </style>
+</head>
+<body>
+    <div class="app-layout" id="app"></div>
+    <script src="/assets/js/config.js"></script>
+    <script src="/assets/js/api.js"></script>
+    <script src="/assets/js/auth.js"></script>
+    <script src="/assets/js/utils.js"></script>
+    <script src="/assets/js/components.js"></script>
+    <script>
+        if (!Auth.requireAuth()) throw new Error('Not authenticated');
+        Components.initLayout('placement', 'Placement Tracker');
+        loadPlacement();
+
+        async function loadPlacement() {
+            const content = document.getElementById('pageContent');
+            content.innerHTML = `
+            <div class="animate-fade-in">
+                <!-- Stats -->
+                <div class="grid grid-cols-4 gap-4 mb-6" id="placementStats">
+                    ${Components.renderSkeleton('card', 4)}
+                </div>
+
+                <!-- Actions -->
+                <div class="flex items-center justify-between mb-6">
+                    <div class="tabs" style="border:none;margin:0">
+                        <button class="tab active" onclick="showView('kanban', this)">Kanban</button>
+                        <button class="tab" onclick="showView('list', this)">List</button>
+                    </div>
+                    <button class="btn btn-primary" onclick="showAddModal()">+ Add Application</button>
+                </div>
+
+                <!-- Kanban View -->
+                <div id="kanbanView" class="kanban-board"></div>
+                <div id="listView" style="display:none"></div>
+            </div>
+
+            <!-- Add Modal -->
+            <div class="modal-overlay" id="addModal" onclick="if(event.target===this)Components.closeModal('addModal')">
+                <div class="modal" style="max-width:500px">
+                    <div class="modal-header">
+                        <h3 class="modal-title">Add Application</h3>
+                        <button class="modal-close" onclick="Components.closeModal('addModal')">✕</button>
+                    </div>
+                    <div class="modal-body">
+                        <form onsubmit="addApplication(event)">
+                            <div class="form-group">
+                                <label class="form-label">Company *</label>
+                                <input type="text" id="appCompany" class="form-input" required placeholder="Google, Microsoft...">
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div class="form-group">
+                                    <label class="form-label">Role</label>
+                                    <input type="text" id="appRole" class="form-input" placeholder="SDE, Data Analyst...">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Package (LPA)</label>
+                                    <input type="text" id="appPackage" class="form-input" placeholder="12">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Status</label>
+                                <select id="appStatus" class="form-input">
+                                    ${Config.PLACEMENT_STATUSES.map(s => `<option value="${s}">${s}</option>`).join('')}
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Notes</label>
+                                <textarea id="appNotes" class="form-input" rows="3" placeholder="Any notes..."></textarea>
+                            </div>
+                            <button type="submit" class="btn btn-primary w-full">Add Application</button>
+                        </form>
+                    </div>
+                </div>
+            </div>`;
+
+            loadStats();
+            loadApplications();
+        }
+
+        async function loadStats() {
+            const el = document.getElementById('placementStats');
+            try {
+                const data = await API.get('/placement/stats');
+                const s = data?.data || {};
+                el.innerHTML = `
+                    <div class="stat-card"><div class="stat-icon blue">📋</div><div class="stat-content"><div class="stat-value">${s.total || 0}</div><div class="stat-label">Applications</div></div></div>
+                    <div class="stat-card"><div class="stat-icon green">✅</div><div class="stat-content"><div class="stat-value">${s.selected || 0}</div><div class="stat-label">Selected</div></div></div>
+                    <div class="stat-card"><div class="stat-icon yellow">⏳</div><div class="stat-content"><div class="stat-value">${s.in_progress || 0}</div><div class="stat-label">In Progress</div></div></div>
+                    <div class="stat-card"><div class="stat-icon purple">🎯</div><div class="stat-content"><div class="stat-value">${s.readiness_score || 0}%</div><div class="stat-label">Readiness</div></div></div>
+                `;
+            } catch (e) { el.innerHTML = ''; }
+        }
+
+        let applications = [];
+
+        async function loadApplications() {
+            try {
+                const data = await API.get('/placement/applications');
+                applications = data?.data?.results || data?.data || [];
+                renderKanban();
+            } catch (e) {
+                document.getElementById('kanbanView').innerHTML = `<p class="text-danger">${e.message}</p>`;
+            }
+        }
+
+        function renderKanban() {
+            const board = document.getElementById('kanbanView');
+            const columns = {};
+            Config.PLACEMENT_STATUSES.forEach(s => columns[s] = []);
+            applications.forEach(app => {
+                const status = app.status || 'Wishlist';
+                if (columns[status]) columns[status].push(app);
+                else columns['Wishlist'].push(app);
+            });
+
+            board.innerHTML = Config.PLACEMENT_STATUSES.map(status => `
+                <div class="kanban-column">
+                    <div class="kanban-column-title">${status} (${columns[status].length})</div>
+                    ${columns[status].map(app => `
+                        <div class="kanban-card">
+                            <p class="text-sm font-semibold">${Utils.escapeHtml(app.company)}</p>
+                            <p class="text-xs text-gray-500">${Utils.escapeHtml(app.role || '')}</p>
+                            ${app.package_lpa ? `<p class="text-xs text-success mt-1">₹${app.package_lpa} LPA</p>` : ''}
+                        </div>
+                    `).join('') || '<p class="text-xs text-gray-400 p-2">No applications</p>'}
+                </div>
+            `).join('');
+        }
+
+        function showView(view, btn) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            btn.classList.add('active');
+            document.getElementById('kanbanView').style.display = view === 'kanban' ? 'flex' : 'none';
+            document.getElementById('listView').style.display = view === 'list' ? 'block' : 'none';
+            if (view === 'list') renderList();
+        }
+
+        function renderList() {
+            document.getElementById('listView').innerHTML = `
+            <div class="table-container">
+                <table class="data-table">
+                    <thead><tr><th>Company</th><th>Role</th><th>Package</th><th>Status</th><th>Date</th></tr></thead>
+                    <tbody>
+                        ${applications.map(a => `
+                            <tr>
+                                <td class="font-medium">${Utils.escapeHtml(a.company)}</td>
+                                <td>${Utils.escapeHtml(a.role || '—')}</td>
+                                <td>${a.package_lpa ? `₹${a.package_lpa} LPA` : '—'}</td>
+                                <td><span class="badge badge-${Utils.getStatusColor(a.status)}">${a.status}</span></td>
+                                <td class="text-gray-500">${Utils.formatDate(a.applied_date || a.created_at)}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>`;
+        }
+
+        function showAddModal() { Components.openModal('addModal'); }
+
+        async function addApplication(e) {
+            e.preventDefault();
+            try {
+                await API.post('/placement/applications/create', {
+                    company: document.getElementById('appCompany').value,
+                    role: document.getElementById('appRole').value,
+                    package_lpa: document.getElementById('appPackage').value || null,
+                    status: document.getElementById('appStatus').value,
+                    notes: document.getElementById('appNotes').value,
+                });
+                Toast.success('Application added!');
+                Components.closeModal('addModal');
+                loadApplications();
+                loadStats();
+            } catch (e) {
+                Toast.error(e.message);
+            }
+        }
+    </script>
+</body>
+</html>

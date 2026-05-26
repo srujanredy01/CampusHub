@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Contests | CampusHub</title>
+    <link rel="stylesheet" href="/assets/css/variables.css">
+    <link rel="stylesheet" href="/assets/css/base.css">
+    <link rel="stylesheet" href="/assets/css/components.css">
+    <link rel="stylesheet" href="/assets/css/utilities.css">
+    <link rel="stylesheet" href="/assets/css/layout.css">
+    <style>
+        .contest-card { border-left: 4px solid var(--primary-500); }
+        .contest-card.live { border-left-color: var(--success-500); }
+        .contest-card.ended { border-left-color: var(--gray-400); }
+        .countdown { font-family: var(--font-mono); font-size: var(--text-lg); font-weight: var(--font-bold); color: var(--primary-700); }
+    </style>
+</head>
+<body>
+    <div class="app-layout" id="app"></div>
+    <script src="/assets/js/config.js"></script>
+    <script src="/assets/js/api.js"></script>
+    <script src="/assets/js/auth.js"></script>
+    <script src="/assets/js/utils.js"></script>
+    <script src="/assets/js/components.js"></script>
+    <script>
+        if (!Auth.requireAuth()) throw new Error('Not authenticated');
+        Components.initLayout('contests', 'Coding Contests');
+        loadContests();
+
+        async function loadContests() {
+            const content = document.getElementById('pageContent');
+            content.innerHTML = `
+            <div class="animate-fade-in">
+                <div class="tabs mb-6">
+                    <button class="tab active" onclick="filterContests('all', this)">All</button>
+                    <button class="tab" onclick="filterContests('upcoming', this)">Upcoming</button>
+                    <button class="tab" onclick="filterContests('live', this)">Live</button>
+                    <button class="tab" onclick="filterContests('ended', this)">Ended</button>
+                </div>
+                <div id="contestsList">${Components.renderSkeleton('card', 3)}</div>
+            </div>`;
+            fetchContests();
+        }
+
+        let allContests = [];
+
+        async function fetchContests() {
+            const el = document.getElementById('contestsList');
+            try {
+                const data = await API.get('/contests');
+                allContests = data?.data?.results || data?.data || [];
+                renderContests(allContests);
+            } catch (e) {
+                el.innerHTML = `<p class="text-danger">${e.message}</p>`;
+            }
+        }
+
+        function renderContests(contests) {
+            const el = document.getElementById('contestsList');
+            if (contests.length === 0) {
+                el.innerHTML = Components.renderEmptyState('🏆', 'No contests', 'Check back later for upcoming contests');
+                return;
+            }
+
+            el.innerHTML = contests.map(c => {
+                const now = new Date();
+                const start = new Date(c.start_time);
+                const end = new Date(c.end_time);
+                let status = 'upcoming';
+                if (now >= start && now <= end) status = 'live';
+                else if (now > end) status = 'ended';
+
+                return `
+                <div class="card contest-card ${status} mb-4 cursor-pointer" onclick="window.location.href='/pages/student/contest-detail.html?id=${c.id}'">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <div class="flex items-center gap-2 mb-1">
+                                ${status === 'live' ? '<span class="badge badge-success">🔴 Live</span>' : ''}
+                                ${status === 'upcoming' ? '<span class="badge badge-info">Upcoming</span>' : ''}
+                                ${status === 'ended' ? '<span class="badge badge-gray">Ended</span>' : ''}
+                            </div>
+                            <h3 class="text-lg font-semibold">${Utils.escapeHtml(c.title)}</h3>
+                            <p class="text-sm text-gray-500 mt-1">${Utils.formatDateTime(c.start_time)} — ${Utils.formatDateTime(c.end_time)}</p>
+                            <p class="text-xs text-gray-400 mt-1">${c.participants_count || 0} participants • ${c.problems_count || 0} problems</p>
+                        </div>
+                        <div class="text-right">
+                            ${status === 'upcoming' ? `<div class="countdown" id="countdown-${c.id}"></div><p class="text-xs text-gray-500">starts in</p>` : ''}
+                            ${status === 'live' ? '<button class="btn btn-success btn-sm">Enter Contest</button>' : ''}
+                            ${status === 'ended' ? '<button class="btn btn-secondary btn-sm">View Results</button>' : ''}
+                        </div>
+                    </div>
+                </div>`;
+            }).join('');
+
+            // Start countdowns
+            contests.forEach(c => {
+                const el = document.getElementById(`countdown-${c.id}`);
+                if (el) {
+                    Utils.countdown(c.start_time, (t) => {
+                        if (t.expired) { el.textContent = 'Started!'; return; }
+                        el.textContent = `${t.days}d ${t.hours}h ${t.minutes}m`;
+                    });
+                }
+            });
+        }
+
+        function filterContests(filter, btn) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            btn.classList.add('active');
+
+            const now = new Date();
+            let filtered = allContests;
+            if (filter === 'upcoming') filtered = allContests.filter(c => new Date(c.start_time) > now);
+            else if (filter === 'live') filtered = allContests.filter(c => now >= new Date(c.start_time) && now <= new Date(c.end_time));
+            else if (filter === 'ended') filtered = allContests.filter(c => now > new Date(c.end_time));
+            renderContests(filtered);
+        }
+    </script>
+</body>
+</html>

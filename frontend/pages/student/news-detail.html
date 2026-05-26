@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>News | CampusHub</title>
+    <link rel="stylesheet" href="/assets/css/variables.css">
+    <link rel="stylesheet" href="/assets/css/base.css">
+    <link rel="stylesheet" href="/assets/css/components.css">
+    <link rel="stylesheet" href="/assets/css/utilities.css">
+    <link rel="stylesheet" href="/assets/css/layout.css">
+</head>
+<body>
+    <div class="app-layout" id="app"></div>
+    <script src="/assets/js/config.js"></script>
+    <script src="/assets/js/api.js"></script>
+    <script src="/assets/js/auth.js"></script>
+    <script src="/assets/js/utils.js"></script>
+    <script src="/assets/js/components.js"></script>
+    <script>
+        if (!Auth.requireAuth()) throw new Error('Not authenticated');
+        Components.initLayout('news', 'News');
+        const params = Utils.getQueryParams();
+        loadNewsDetail(params.id);
+
+        async function loadNewsDetail(id) {
+            const content = document.getElementById('pageContent');
+            if (!id) { content.innerHTML = '<p class="text-danger">No news ID</p>'; return; }
+            try {
+                const data = await API.get(`/news/${id}`);
+                const n = data?.data || data;
+                Utils.setPageTitle(n.title);
+                content.innerHTML = `
+                <div class="animate-fade-in">
+                    <a href="/pages/student/news.html" class="btn btn-ghost btn-sm mb-4">← Back</a>
+                    <div class="card">
+                        ${n.image ? `<img src="${n.image}" style="width:100%;max-height:300px;object-fit:cover;border-radius:var(--radius-lg);margin-bottom:var(--space-4)" alt="">` : ''}
+                        <h2 class="text-2xl font-bold mb-2">${Utils.escapeHtml(n.title)}</h2>
+                        <p class="text-sm text-gray-500 mb-6">${Utils.formatDateTime(n.created_at)} • By ${Utils.escapeHtml(n.author_name || 'Admin')}</p>
+                        <div class="text-sm text-gray-700" style="line-height:1.8">${n.content || ''}</div>
+                    </div>
+                </div>`;
+            } catch (e) { content.innerHTML = `<p class="text-danger">${e.message}</p>`; }
+        }
+    </script>
+</body>
+</html>

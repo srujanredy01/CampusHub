@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Assignments | CampusHub</title>
+    <link rel="stylesheet" href="/assets/css/variables.css">
+    <link rel="stylesheet" href="/assets/css/base.css">
+    <link rel="stylesheet" href="/assets/css/components.css">
+    <link rel="stylesheet" href="/assets/css/utilities.css">
+    <link rel="stylesheet" href="/assets/css/layout.css">
+</head>
+<body>
+    <div class="app-layout" id="app"></div>
+    <script src="/assets/js/config.js"></script>
+    <script src="/assets/js/api.js"></script>
+    <script src="/assets/js/auth.js"></script>
+    <script src="/assets/js/utils.js"></script>
+    <script src="/assets/js/components.js"></script>
+    <script>
+        if (!Auth.requireAuth()) throw new Error('Not authenticated');
+        Components.initLayout('assignments', 'Assignments');
+        loadAssignments();
+
+        let activeTab = 'all';
+
+        async function loadAssignments() {
+            const content = document.getElementById('pageContent');
+            content.innerHTML = `
+            <div class="animate-fade-in">
+                <div class="tabs mb-6">
+                    <button class="tab active" onclick="switchTab('all', this)">All</button>
+                    <button class="tab" onclick="switchTab('pending', this)">Pending</button>
+                    <button class="tab" onclick="switchTab('submitted', this)">Submitted</button>
+                    <button class="tab" onclick="switchTab('graded', this)">Graded</button>
+                </div>
+                <div id="assignmentsList">
+                    ${Components.renderSkeleton('text', 4)}
+                </div>
+            </div>`;
+            fetchAssignments();
+        }
+
+        async function fetchAssignments() {
+            const el = document.getElementById('assignmentsList');
+            try {
+                const data = await API.get('/assignments');
+                let items = data?.data?.results || data?.data || [];
+
+                if (activeTab !== 'all') {
+                    items = items.filter(a => (a.status || 'pending').toLowerCase() === activeTab);
+                }
+
+                if (items.length === 0) {
+                    el.innerHTML = Components.renderEmptyState('📝', 'No assignments', 'No assignments in this category');
+                    return;
+                }
+
+                el.innerHTML = items.map(a => `
+                    <div class="card mb-4 cursor-pointer" onclick="window.location.href='/pages/student/assignment-detail.html?id=${a.id}'">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h4 class="font-semibold text-gray-900">${Utils.escapeHtml(a.title)}</h4>
+                                <p class="text-sm text-gray-500 mt-1">${Utils.escapeHtml(a.subject || '')} • Due: ${Utils.formatDate(a.due_date)}</p>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <span class="badge badge-${Utils.getStatusColor(a.status || 'pending')}">${a.status || 'Pending'}</span>
+                                ${a.grade ? `<span class="text-sm font-semibold">${a.grade}/${a.max_grade || 100}</span>` : ''}
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (e) {
+                el.innerHTML = `<p class="text-danger">Failed to load: ${e.message}</p>`;
+            }
+        }
+
+        function switchTab(tab, btn) {
+            activeTab = tab;
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            btn.classList.add('active');
+            fetchAssignments();
+        }
+    </script>
+</body>
+</html>

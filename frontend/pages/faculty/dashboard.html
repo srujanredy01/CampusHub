@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Faculty Dashboard | CampusHub</title>
+    <link rel="stylesheet" href="/assets/css/variables.css">
+    <link rel="stylesheet" href="/assets/css/base.css">
+    <link rel="stylesheet" href="/assets/css/components.css">
+    <link rel="stylesheet" href="/assets/css/utilities.css">
+    <link rel="stylesheet" href="/assets/css/layout.css">
+</head>
+<body>
+    <div class="app-layout" id="app"></div>
+    <script src="/assets/js/config.js"></script>
+    <script src="/assets/js/api.js"></script>
+    <script src="/assets/js/auth.js"></script>
+    <script src="/assets/js/utils.js"></script>
+    <script src="/assets/js/components.js"></script>
+    <script>
+        if (!Auth.requireFaculty()) throw new Error('Not faculty');
+        Components.initLayout('dashboard', 'Faculty Dashboard');
+        loadFacultyDashboard();
+
+        async function loadFacultyDashboard() {
+            const content = document.getElementById('pageContent');
+            const user = Auth.getUser();
+
+            content.innerHTML = `
+            <div class="animate-fade-in">
+                <div class="mb-8">
+                    <h2 class="text-2xl font-bold">Welcome, ${Utils.escapeHtml(user?.full_name?.split(' ')[0] || 'Professor')} 👋</h2>
+                    <p class="text-sm text-gray-500">Manage your assignments, resources, and announcements</p>
+                </div>
+
+                <div class="grid grid-cols-3 gap-4 mb-8">
+                    <div class="stat-card"><div class="stat-icon blue">📝</div><div class="stat-content"><div class="stat-value" id="assignCount">—</div><div class="stat-label">Active Assignments</div></div></div>
+                    <div class="stat-card"><div class="stat-icon green">📚</div><div class="stat-content"><div class="stat-value" id="resourceCount">—</div><div class="stat-label">Resources Uploaded</div></div></div>
+                    <div class="stat-card"><div class="stat-icon yellow">✅</div><div class="stat-content"><div class="stat-value" id="pendingCount">—</div><div class="stat-label">Pending Grading</div></div></div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-6">
+                    <div class="card">
+                        <h3 class="card-title mb-4">Quick Actions</h3>
+                        <div class="flex flex-col gap-3">
+                            <a href="/pages/faculty/assignments.html" class="btn btn-secondary w-full">📝 Create Assignment</a>
+                            <a href="/pages/faculty/resources.html" class="btn btn-secondary w-full">📚 Upload Resource</a>
+                            <a href="/pages/faculty/grading.html" class="btn btn-secondary w-full">✅ Grade Submissions</a>
+                            <a href="/pages/faculty/announcements.html" class="btn btn-secondary w-full">📢 Post Announcement</a>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <h3 class="card-title mb-4">Recent Submissions</h3>
+                        <div id="recentSubmissions"><p class="text-sm text-gray-500">Loading...</p></div>
+                    </div>
+                </div>
+            </div>`;
+        }
+    </script>
+</body>
+</html>
