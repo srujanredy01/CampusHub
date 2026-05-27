@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sidebar Navigation — CampusHub</title>
+    <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
+    <link rel="stylesheet" href="/assets/css/variables.css">
+    <link rel="stylesheet" href="/assets/css/base.css">
+    <link rel="stylesheet" href="/assets/css/sidebar.css">
+    <style>
+        /* Demo page styles */
+        body {
+            margin: 0;
+            font-family: var(--font-sans, 'Inter', -apple-system, sans-serif);
+            background: var(--surface-bg, #f8fafc);
+            color: var(--gray-700, #334155);
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .demo-topbar {
+            position: sticky;
+            top: 0;
+            z-index: 200;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 0 24px;
+            height: 56px;
+            background: rgba(255,255,255,0.88);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border-primary, #e2e8f0);
+        }
+
+        [data-theme="dark"] .demo-topbar {
+            background: rgba(17,17,19,0.88);
+        }
+
+        .demo-menu-btn {
+            display: none;
+            width: 36px;
+            height: 36px;
+            align-items: center;
+            justify-content: center;
+            border: none;
+            background: transparent;
+            border-radius: 8px;
+            color: var(--gray-600);
+            cursor: pointer;
+        }
+
+        .demo-menu-btn:hover {
+            background: var(--surface-hover);
+        }
+
+        @media (max-width: 1024px) {
+            .demo-menu-btn { display: flex; }
+        }
+
+        .demo-topbar-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--gray-900);
+        }
+
+        .demo-topbar-right {
+            margin-left: auto;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .demo-theme-btn {
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: none;
+            background: transparent;
+            border-radius: 8px;
+            color: var(--gray-500);
+            cursor: pointer;
+            transition: background 120ms;
+        }
+
+        .demo-theme-btn:hover {
+            background: var(--surface-hover);
+            color: var(--gray-700);
+        }
+
+        .demo-content {
+            padding: 32px;
+            max-width: 900px;
+        }
+
+        .demo-content h1 {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--gray-900);
+            margin: 0 0 8px;
+            letter-spacing: -0.02em;
+        }
+
+        .demo-content p {
+            font-size: 14px;
+            color: var(--gray-500);
+            margin: 0 0 32px;
+            line-height: 1.6;
+        }
+
+        .demo-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+            gap: 16px;
+        }
+
+        .demo-card {
+            background: var(--surface-card, #fff);
+            border: 1px solid var(--border-primary);
+            border-radius: 12px;
+            padding: 20px;
+            transition: box-shadow 200ms;
+        }
+
+        .demo-card:hover {
+            box-shadow: var(--shadow-md);
+        }
+
+        .demo-card h3 {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--gray-800);
+            margin: 0 0 6px;
+        }
+
+        .demo-card p {
+            font-size: 12px;
+            color: var(--gray-400);
+            margin: 0;
+        }
+    </style>
+</head>
+<body>
+    <!-- Sidebar will be injected here -->
+    <div id="sidebar-root"></div>
+
+    <!-- Main Content -->
+    <div class="main-content" id="mainContent">
+        <div class="demo-topbar">
+            <button class="demo-menu-btn" onclick="Sidebar.openMobile()" aria-label="Open menu">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+            </button>
+            <span class="demo-topbar-title">Dashboard</span>
+            <div class="demo-topbar-right">
+                <button class="demo-theme-btn" onclick="toggleTheme()" aria-label="Toggle theme">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+                </button>
+            </div>
+        </div>
+
+        <div class="demo-content">
+            <h1>Welcome back, Student</h1>
+            <p>This is a demonstration of the redesigned CampusHub sidebar navigation. Try collapsing it, toggling dark mode, or resizing the browser to see responsive behavior.</p>
+
+            <div class="demo-cards">
+                <div class="demo-card">
+                    <h3>Collapse Toggle</h3>
+                    <p>Click the panel icon in the sidebar header to collapse/expand.</p>
+                </div>
+                <div class="demo-card">
+                    <h3>Group Collapse</h3>
+                    <p>Click any section header (ACADEMICS, COMMUNITY, etc.) to collapse that group.</p>
+                </div>
+                <div class="demo-card">
+                    <h3>Dark Mode</h3>
+                    <p>Click the sun icon in the top bar to toggle between light and dark themes.</p>
+                </div>
+                <div class="demo-card">
+                    <h3>Responsive</h3>
+                    <p>Resize below 1024px to see the mobile drawer behavior with overlay.</p>
+                </div>
+                <div class="demo-card">
+                    <h3>Keyboard Navigation</h3>
+                    <p>Use Tab to focus items, Arrow keys to navigate, Enter to activate.</p>
+                </div>
+                <div class="demo-card">
+                    <h3>Tooltips</h3>
+                    <p>In collapsed mode, hover over icons to see tooltip labels.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/assets/js/sidebar.js"></script>
+    <script>
+        // Initialize sidebar with active item and badge counts
+        Sidebar.init('dashboard', {
+            notifications: 3,
+            assignments: 5,
+        });
+
+        // Theme toggle
+        function toggleTheme() {
+            const html = document.documentElement;
+            const current = html.getAttribute('data-theme');
+            const next = current === 'dark' ? 'light' : 'dark';
+            html.setAttribute('data-theme', next);
+            localStorage.setItem('theme', next);
+        }
+
+        // Restore theme
+        (function() {
+            const saved = localStorage.getItem('theme');
+            if (saved) {
+                document.documentElement.setAttribute('data-theme', saved);
+            } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                document.documentElement.setAttribute('data-theme', 'dark');
+            }
+        })();
+    </script>
+</body>
+</html>

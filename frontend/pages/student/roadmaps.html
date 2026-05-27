@@ -9,13 +9,66 @@
     <link rel="stylesheet" href="/assets/css/components.css">
     <link rel="stylesheet" href="/assets/css/utilities.css">
     <link rel="stylesheet" href="/assets/css/layout.css">
+    <link rel="stylesheet" href="/assets/css/sidebar.css">
     <style>
-        .roadmap-card { position: relative; overflow: hidden; }
-        .roadmap-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: linear-gradient(90deg, var(--primary-500), var(--purple-500)); }
-        .milestone { padding: var(--space-4); border-left: 3px solid var(--gray-200); margin-left: var(--space-4); }
-        .milestone.completed { border-left-color: var(--success-500); }
-        .milestone-dot { width: 12px; height: 12px; border-radius: var(--radius-full); background: var(--gray-300); position: absolute; left: -7px; top: var(--space-4); }
-        .milestone.completed .milestone-dot { background: var(--success-500); }
+        .roadmap-card {
+            background: var(--surface-card);
+            border: 1px solid var(--border-primary);
+            border-radius: var(--radius-xl);
+            padding: var(--space-5);
+            transition: all var(--transition-fast);
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+        }
+        .roadmap-card:hover {
+            border-color: var(--primary-200);
+            box-shadow: var(--shadow-md);
+            transform: translateY(-2px);
+        }
+        .roadmap-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: var(--radius-xl);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            margin-bottom: var(--space-4);
+        }
+        .roadmap-icon.web { background: var(--info-50); }
+        .roadmap-icon.ai { background: var(--purple-50); }
+        .roadmap-icon.devops { background: var(--success-50); }
+        .roadmap-icon.security { background: var(--danger-50); }
+        .roadmap-icon.dsa { background: var(--warning-50); }
+        .roadmap-title {
+            font-size: var(--text-base);
+            font-weight: var(--font-semibold);
+            color: var(--gray-900);
+            margin-bottom: var(--space-1);
+        }
+        .roadmap-desc {
+            font-size: var(--text-xs);
+            color: var(--gray-500);
+            line-height: var(--leading-relaxed);
+            margin-bottom: var(--space-4);
+            flex: 1;
+        }
+        .roadmap-progress-section {
+            margin-top: auto;
+        }
+        .roadmap-stats {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: var(--space-2);
+        }
+        .roadmap-stat {
+            font-size: var(--text-2xs);
+            color: var(--gray-500);
+        }
+        .roadmap-stat strong {
+            color: var(--gray-800);
+        }
     </style>
 </head>
 <body>
@@ -24,6 +77,7 @@
     <script src="/assets/js/api.js"></script>
     <script src="/assets/js/auth.js"></script>
     <script src="/assets/js/utils.js"></script>
+    <script src="/assets/js/sidebar.js"></script>
     <script src="/assets/js/components.js"></script>
     <script>
         if (!Auth.requireAuth()) throw new Error('Not authenticated');
@@ -34,57 +88,67 @@
             const content = document.getElementById('pageContent');
             content.innerHTML = `
             <div class="animate-fade-in">
-                <div class="mb-6">
-                    <h2 class="text-xl font-bold">Choose Your Path</h2>
-                    <p class="text-sm text-gray-500">Follow structured roadmaps to build your career</p>
+                <div class="page-header mb-6">
+                    <h2 class="page-title">Career Roadmaps</h2>
+                    <p class="page-subtitle">Structured learning paths to guide your career</p>
                 </div>
-                <div class="grid grid-cols-3 gap-6" id="roadmapsGrid">
-                    ${Components.renderSkeleton('card', 5)}
-                </div>
+                <div class="grid grid-cols-3 gap-5" id="roadmapGrid">${Components.renderSkeleton('card', 5)}</div>
             </div>`;
+            fetchRoadmaps();
+        }
 
+        async function fetchRoadmaps() {
+            const grid = document.getElementById('roadmapGrid');
             try {
                 const data = await API.get('/roadmaps');
-                const roadmaps = data?.data?.results || data?.data || [];
-                const grid = document.getElementById('roadmapsGrid');
+                const items = data?.data?.results || data?.data || [];
 
-                if (roadmaps.length === 0) {
-                    grid.innerHTML = Components.renderEmptyState('🗺️', 'No roadmaps available', 'Roadmaps will be added soon');
+                if (items.length === 0) {
+                    // Show default roadmaps
+                    const defaults = [
+                        { id: 'web', title: 'Web Development', desc: 'Full-stack web development with modern frameworks', icon: '🌐', iconClass: 'web', milestones: 12, completed: 0 },
+                        { id: 'ai', title: 'AI / Machine Learning', desc: 'From fundamentals to deep learning and deployment', icon: '🤖', iconClass: 'ai', milestones: 15, completed: 0 },
+                        { id: 'devops', title: 'DevOps & Cloud', desc: 'CI/CD, containers, cloud infrastructure', icon: '☁️', iconClass: 'devops', milestones: 10, completed: 0 },
+                        { id: 'security', title: 'Cybersecurity', desc: 'Network security, ethical hacking, and defense', icon: '🔒', iconClass: 'security', milestones: 11, completed: 0 },
+                        { id: 'dsa', title: 'DSA + Placements', desc: 'Data structures, algorithms, and interview prep', icon: '🎯', iconClass: 'dsa', milestones: 20, completed: 0 },
+                    ];
+                    grid.innerHTML = defaults.map(r => renderRoadmapCard(r)).join('');
                     return;
                 }
 
-                grid.innerHTML = roadmaps.map(r => {
-                    const progress = r.progress || 0;
-                    return `
-                    <div class="card roadmap-card cursor-pointer" onclick="window.location.href='/pages/student/roadmap-detail.html?slug=${r.slug}'">
-                        <div class="mb-3">
-                            <span class="text-2xl">${getIcon(r.category || r.title)}</span>
-                        </div>
-                        <h3 class="font-semibold text-gray-900">${Utils.escapeHtml(r.title)}</h3>
-                        <p class="text-xs text-gray-500 mt-1 line-clamp-2">${Utils.escapeHtml(r.description || '')}</p>
-                        <div class="mt-4">
-                            <div class="flex justify-between text-xs mb-1">
-                                <span class="text-gray-500">${r.milestones_count || 0} milestones</span>
-                                <span class="font-medium">${progress}%</span>
-                            </div>
-                            <div class="progress-bar">
-                                <div class="progress-fill" style="width:${progress}%"></div>
-                            </div>
-                        </div>
-                        ${r.is_enrolled ? '<span class="badge badge-success mt-3">Enrolled</span>' : ''}
-                    </div>`;
-                }).join('');
+                grid.innerHTML = items.map(r => renderRoadmapCard(r)).join('');
             } catch (e) {
-                document.getElementById('roadmapsGrid').innerHTML = `<p class="text-danger">${e.message}</p>`;
+                // Fallback
+                const defaults = [
+                    { id: 'web', title: 'Web Development', desc: 'Full-stack web development with modern frameworks', icon: '🌐', iconClass: 'web', milestones: 12, completed: 0 },
+                    { id: 'ai', title: 'AI / Machine Learning', desc: 'From fundamentals to deep learning and deployment', icon: '🤖', iconClass: 'ai', milestones: 15, completed: 0 },
+                    { id: 'devops', title: 'DevOps & Cloud', desc: 'CI/CD, containers, cloud infrastructure', icon: '☁️', iconClass: 'devops', milestones: 10, completed: 0 },
+                    { id: 'security', title: 'Cybersecurity', desc: 'Network security, ethical hacking, and defense', icon: '🔒', iconClass: 'security', milestones: 11, completed: 0 },
+                    { id: 'dsa', title: 'DSA + Placements', desc: 'Data structures, algorithms, and interview prep', icon: '🎯', iconClass: 'dsa', milestones: 20, completed: 0 },
+                ];
+                grid.innerHTML = defaults.map(r => renderRoadmapCard(r)).join('');
             }
         }
 
-        function getIcon(category) {
-            const icons = { 'Web Development': '🌐', 'AI/ML': '🤖', 'DevOps': '⚙️', 'Cybersecurity': '🔒', 'DSA': '📊' };
-            for (const [key, icon] of Object.entries(icons)) {
-                if (category?.includes(key)) return icon;
-            }
-            return '🗺️';
+        function renderRoadmapCard(r) {
+            const total = r.milestones || r.total_milestones || 10;
+            const completed = r.completed || r.completed_milestones || 0;
+            const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
+            return `
+            <div class="roadmap-card" onclick="window.location.href='/pages/student/roadmap-detail.html?id=${r.id}'">
+                <div class="roadmap-icon ${r.iconClass || ''}">${r.icon || '📍'}</div>
+                <div class="roadmap-title">${Utils.escapeHtml(r.title || r.name || '')}</div>
+                <div class="roadmap-desc">${Utils.escapeHtml(r.desc || r.description || '')}</div>
+                <div class="roadmap-progress-section">
+                    <div class="roadmap-stats">
+                        <span class="roadmap-stat"><strong>${completed}</strong> / ${total} milestones</span>
+                        <span class="roadmap-stat"><strong>${pct}%</strong></span>
+                    </div>
+                    <div class="progress-bar progress-bar-sm">
+                        <div class="progress-fill" style="width:${pct}%"></div>
+                    </div>
+                </div>
+            </div>`;
         }
     </script>
 </body>

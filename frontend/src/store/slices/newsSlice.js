@@ -17,8 +17,8 @@ export const fetchNewsItem = createAsyncThunk(
   "news/fetchOne",
   async (id, { rejectWithValue }) => {
     try {
-      const response = await api.get(`/news/${id}/`);
-      return response.data.data;
+      const response = await api.get(`/news/${id}`);
+      return response.data.data || response.data;
     } catch (error) {
       return rejectWithValue(error.response?.data?.error?.message || "Failed to fetch article");
     }

@@ -28,9 +28,10 @@ root.render(
           draggable
           pauseOnHover
           theme="light"
-          toastClassName="!rounded-2xl !shadow-lg !font-sans !text-sm"
-          bodyClassName="!font-sans"
-          limit={4}
+          toastClassName="!rounded-2xl !shadow-float !font-sans !text-sm !border !border-surface-100"
+          bodyClassName="!font-sans !text-slate-700"
+          progressClassName="!bg-primary-500"
+          limit={3}
         />
       </BrowserRouter>
     </Provider>

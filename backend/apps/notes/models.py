@@ -134,3 +134,104 @@ class NoteRating(models.Model):
         self.note.average_rating = round(agg["avg"] or 0, 2)
         self.note.rating_count   = agg["cnt"] or 0
         self.note.save(update_fields=["average_rating", "rating_count"])
+
+
+class NoteComment(models.Model):
+    """Comments on shared notes."""
+    id      = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    note    = models.ForeignKey(Note, on_delete=models.CASCADE, related_name="comments")
+    user    = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="note_comments")
+    content = models.TextField()
+    parent  = models.ForeignKey("self", null=True, blank=True, on_delete=models.CASCADE, related_name="replies")
+    is_deleted = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "note_comments"
+        ordering = ["created_at"]
+        indexes = [
+            models.Index(fields=["note", "created_at"]),
+            models.Index(fields=["user", "created_at"]),
+        ]
+
+    def __str__(self):
+        return f"{self.user.full_name} on {self.note.title}: {self.content[:50]}"
+
+
+class NoteShare(models.Model):
+    """Track note sharing between users."""
+    SHARE_TYPE_CHOICES = [
+        ("public", "Public"),
+        ("private", "Private"),
+        ("link", "Link Share"),
+    ]
+
+    id         = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    note       = models.ForeignKey(Note, on_delete=models.CASCADE, related_name="shares")
+    shared_by  = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="notes_shared")
+    shared_with = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+        null=True, blank=True, related_name="notes_received"
+    )
+    share_type = models.CharField(max_length=10, choices=SHARE_TYPE_CHOICES, default="public")
+    share_link = models.CharField(max_length=64, unique=True, blank=True)
+    message    = models.TextField(blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "note_shares"
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["note", "-created_at"]),
+            models.Index(fields=["shared_with", "-created_at"]),
+            models.Index(fields=["share_link"]),
+        ]
+
+    def save(self, *args, **kwargs):
+        if not self.share_link:
+            import secrets
+            self.share_link = secrets.token_urlsafe(32)
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        target = self.shared_with.full_name if self.shared_with else "public"
+        return f"{self.shared_by.full_name} shared {self.note.title} with {target}"
+
+
+class NoteReport(models.Model):
+    """Report inappropriate notes."""
+    REASON_CHOICES = [
+        ("spam", "Spam"),
+        ("inappropriate", "Inappropriate Content"),
+        ("copyright", "Copyright Violation"),
+        ("misleading", "Misleading Information"),
+        ("other", "Other"),
+    ]
+    STATUS_CHOICES = [
+        ("pending", "Pending"),
+        ("reviewed", "Reviewed"),
+        ("resolved", "Resolved"),
+        ("dismissed", "Dismissed"),
+    ]
+
+    id       = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    note     = models.ForeignKey(Note, on_delete=models.CASCADE, related_name="reports")
+    reporter = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="note_reports")
+    reason   = models.CharField(max_length=20, choices=REASON_CHOICES)
+    description = models.TextField(blank=True, default="")
+    status   = models.CharField(max_length=10, choices=STATUS_CHOICES, default="pending")
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name="reviewed_note_reports"
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "note_reports"
+        ordering = ["-created_at"]
+        unique_together = [["note", "reporter"]]
+        indexes = [
+            models.Index(fields=["status", "-created_at"]),
+        ]

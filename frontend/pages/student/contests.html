@@ -4,16 +4,122 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Contests | CampusHub</title>
+    <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
     <link rel="stylesheet" href="/assets/css/variables.css">
     <link rel="stylesheet" href="/assets/css/base.css">
     <link rel="stylesheet" href="/assets/css/components.css">
     <link rel="stylesheet" href="/assets/css/utilities.css">
     <link rel="stylesheet" href="/assets/css/layout.css">
+    <link rel="stylesheet" href="/assets/css/sidebar.css">
     <style>
-        .contest-card { border-left: 4px solid var(--primary-500); }
-        .contest-card.live { border-left-color: var(--success-500); }
-        .contest-card.ended { border-left-color: var(--gray-400); }
-        .countdown { font-family: var(--font-mono); font-size: var(--text-lg); font-weight: var(--font-bold); color: var(--primary-700); }
+        .contests-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+            gap: var(--space-4);
+        }
+        .contest-card {
+            background: var(--surface-card);
+            border: 1px solid var(--border-primary);
+            border-radius: var(--radius-xl);
+            padding: var(--space-5);
+            transition: all var(--transition-moderate);
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+        .contest-card:hover {
+            border-color: var(--primary-200);
+            box-shadow: var(--shadow-card-hover);
+            transform: translateY(-2px);
+        }
+        .contest-card.live {
+            border-color: var(--success-300);
+        }
+        .contest-card.live::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--success-400), var(--success-600));
+        }
+        .contest-status {
+            display: inline-flex;
+            align-items: center;
+            gap: var(--space-1);
+            font-size: var(--text-2xs);
+            font-weight: var(--font-semibold);
+            padding: var(--space-0-5) var(--space-2);
+            border-radius: var(--radius-full);
+            margin-bottom: var(--space-3);
+        }
+        .contest-status.live {
+            background: var(--success-50);
+            color: var(--success-700);
+        }
+        .contest-status.live::before {
+            content: '';
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--success-500);
+            animation: pulse 2s ease-in-out infinite;
+        }
+        .contest-status.upcoming {
+            background: var(--info-50);
+            color: var(--info-700);
+        }
+        .contest-status.ended {
+            background: var(--gray-100);
+            color: var(--gray-600);
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+        .contest-title {
+            font-size: var(--text-md);
+            font-weight: var(--font-semibold);
+            color: var(--gray-900);
+            margin-bottom: var(--space-2);
+        }
+        .contest-meta {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-1-5);
+            margin-bottom: var(--space-4);
+        }
+        .contest-meta-item {
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+            font-size: var(--text-xs);
+            color: var(--gray-500);
+        }
+        .contest-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding-top: var(--space-3);
+            border-top: 1px solid var(--border-secondary);
+        }
+        .contest-participants {
+            display: flex;
+            align-items: center;
+            gap: var(--space-1);
+            font-size: var(--text-xs);
+            color: var(--gray-500);
+        }
+        .contest-timer {
+            font-family: var(--font-mono);
+            font-size: var(--text-sm);
+            font-weight: var(--font-semibold);
+            color: var(--primary-600);
+            background: var(--primary-50);
+            padding: var(--space-1) var(--space-2-5);
+            border-radius: var(--radius-lg);
+        }
     </style>
 </head>
 <body>
@@ -22,99 +128,108 @@
     <script src="/assets/js/api.js"></script>
     <script src="/assets/js/auth.js"></script>
     <script src="/assets/js/utils.js"></script>
+    <script src="/assets/js/sidebar.js"></script>
     <script src="/assets/js/components.js"></script>
     <script>
         if (!Auth.requireAuth()) throw new Error('Not authenticated');
-        Components.initLayout('contests', 'Coding Contests');
+        Components.initLayout('contests', 'Contests');
         loadContests();
 
         async function loadContests() {
             const content = document.getElementById('pageContent');
             content.innerHTML = `
             <div class="animate-fade-in">
-                <div class="tabs mb-6">
-                    <button class="tab active" onclick="filterContests('all', this)">All</button>
-                    <button class="tab" onclick="filterContests('upcoming', this)">Upcoming</button>
-                    <button class="tab" onclick="filterContests('live', this)">Live</button>
-                    <button class="tab" onclick="filterContests('ended', this)">Ended</button>
+                <div class="flex justify-between items-center mb-5 flex-wrap gap-3">
+                    <div>
+                        <h2 class="page-title">Coding Contests</h2>
+                        <p class="page-subtitle">Compete, learn, and climb the leaderboard</p>
+                    </div>
+                    <a href="/pages/student/leaderboard.html" class="btn btn-secondary btn-sm">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                        Leaderboard
+                    </a>
                 </div>
-                <div id="contestsList">${Components.renderSkeleton('card', 3)}</div>
+
+                <div class="tabs mb-5">
+                    <span class="tab active" onclick="filterContests('all')">All</span>
+                    <span class="tab" onclick="filterContests('live')">Live</span>
+                    <span class="tab" onclick="filterContests('upcoming')">Upcoming</span>
+                    <span class="tab" onclick="filterContests('ended')">Past</span>
+                </div>
+
+                <div class="contests-grid" id="contestsGrid">
+                    ${Components.renderSkeleton('card', 4)}
+                </div>
             </div>`;
+
             fetchContests();
         }
 
-        let allContests = [];
+        let currentFilter = 'all';
 
         async function fetchContests() {
-            const el = document.getElementById('contestsList');
+            const grid = document.getElementById('contestsGrid');
             try {
-                const data = await API.get('/contests');
-                allContests = data?.data?.results || data?.data || [];
-                renderContests(allContests);
-            } catch (e) {
-                el.innerHTML = `<p class="text-danger">${e.message}</p>`;
-            }
-        }
+                const params = {};
+                if (currentFilter !== 'all') params.status = currentFilter;
+                const data = await API.get('/contests', params);
+                const items = data?.data?.results || data?.data || [];
 
-        function renderContests(contests) {
-            const el = document.getElementById('contestsList');
-            if (contests.length === 0) {
-                el.innerHTML = Components.renderEmptyState('🏆', 'No contests', 'Check back later for upcoming contests');
-                return;
-            }
-
-            el.innerHTML = contests.map(c => {
-                const now = new Date();
-                const start = new Date(c.start_time);
-                const end = new Date(c.end_time);
-                let status = 'upcoming';
-                if (now >= start && now <= end) status = 'live';
-                else if (now > end) status = 'ended';
-
-                return `
-                <div class="card contest-card ${status} mb-4 cursor-pointer" onclick="window.location.href='/pages/student/contest-detail.html?id=${c.id}'">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <div class="flex items-center gap-2 mb-1">
-                                ${status === 'live' ? '<span class="badge badge-success">🔴 Live</span>' : ''}
-                                ${status === 'upcoming' ? '<span class="badge badge-info">Upcoming</span>' : ''}
-                                ${status === 'ended' ? '<span class="badge badge-gray">Ended</span>' : ''}
-                            </div>
-                            <h3 class="text-lg font-semibold">${Utils.escapeHtml(c.title)}</h3>
-                            <p class="text-sm text-gray-500 mt-1">${Utils.formatDateTime(c.start_time)} — ${Utils.formatDateTime(c.end_time)}</p>
-                            <p class="text-xs text-gray-400 mt-1">${c.participants_count || 0} participants • ${c.problems_count || 0} problems</p>
-                        </div>
-                        <div class="text-right">
-                            ${status === 'upcoming' ? `<div class="countdown" id="countdown-${c.id}"></div><p class="text-xs text-gray-500">starts in</p>` : ''}
-                            ${status === 'live' ? '<button class="btn btn-success btn-sm">Enter Contest</button>' : ''}
-                            ${status === 'ended' ? '<button class="btn btn-secondary btn-sm">View Results</button>' : ''}
-                        </div>
-                    </div>
-                </div>`;
-            }).join('');
-
-            // Start countdowns
-            contests.forEach(c => {
-                const el = document.getElementById(`countdown-${c.id}`);
-                if (el) {
-                    Utils.countdown(c.start_time, (t) => {
-                        if (t.expired) { el.textContent = 'Started!'; return; }
-                        el.textContent = `${t.days}d ${t.hours}h ${t.minutes}m`;
-                    });
+                if (items.length === 0) {
+                    grid.innerHTML = Components.renderEmptyState('🏆', 'No contests available', 'Check back later for upcoming contests');
+                    return;
                 }
-            });
+
+                grid.innerHTML = items.map(item => {
+                    const status = getContestStatus(item);
+                    return `
+                        <div class="contest-card ${status}" onclick="window.location.href='/pages/student/contest-detail.html?id=${item.id}'">
+                            <span class="contest-status ${status}">${status === 'live' ? 'Live Now' : status === 'upcoming' ? 'Upcoming' : 'Ended'}</span>
+                            <h3 class="contest-title">${Utils.escapeHtml(item.title)}</h3>
+                            <div class="contest-meta">
+                                <div class="contest-meta-item">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                                    ${item.start_time ? Utils.formatDate(item.start_time) : '—'}
+                                </div>
+                                <div class="contest-meta-item">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                                    Duration: ${item.duration_minutes || 60} min
+                                </div>
+                                <div class="contest-meta-item">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+                                    ${item.problem_count || item.problems?.length || '—'} problems
+                                </div>
+                            </div>
+                            <div class="contest-footer">
+                                <div class="contest-participants">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+                                    ${item.participant_count || 0} participants
+                                </div>
+                                ${status === 'live' ? '<span class="contest-timer">In Progress</span>' :
+                                  status === 'upcoming' ? `<span class="btn btn-primary btn-xs">Register</span>` :
+                                  '<span class="badge badge-gray">Completed</span>'}
+                            </div>
+                        </div>`;
+                }).join('');
+            } catch (e) {
+                grid.innerHTML = '<p class="text-sm text-gray-500 p-4">Unable to load contests</p>';
+            }
         }
 
-        function filterContests(filter, btn) {
-            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            btn.classList.add('active');
-
+        function getContestStatus(item) {
             const now = new Date();
-            let filtered = allContests;
-            if (filter === 'upcoming') filtered = allContests.filter(c => new Date(c.start_time) > now);
-            else if (filter === 'live') filtered = allContests.filter(c => now >= new Date(c.start_time) && now <= new Date(c.end_time));
-            else if (filter === 'ended') filtered = allContests.filter(c => now > new Date(c.end_time));
-            renderContests(filtered);
+            const start = item.start_time ? new Date(item.start_time) : null;
+            const end = item.end_time ? new Date(item.end_time) : null;
+            if (start && end && now >= start && now <= end) return 'live';
+            if (start && now < start) return 'upcoming';
+            return 'ended';
+        }
+
+        function filterContests(filter) {
+            currentFilter = filter;
+            document.querySelectorAll('.tabs .tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            fetchContests();
         }
     </script>
 </body>

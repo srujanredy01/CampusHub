@@ -39,6 +39,11 @@ import AssignmentsPage    from "./pages/AssignmentsPage";
 import LeaderboardPage    from "./pages/LeaderboardPage";
 import ContestsPage       from "./pages/ContestsPage";
 import ContestDetailPage  from "./pages/ContestDetailPage";
+import SavedContentPage   from "./pages/SavedContentPage";
+import SettingsPage       from "./pages/SettingsPage";
+import CommunicationPage from "./pages/CommunicationPage";
+import EventsPage        from "./pages/EventsPage";
+import EventDetailPage   from "./pages/EventDetailPage";
 
 // ── Admin pages ───────────────────────────────────────────────────────────────
 import AdminDashboardPage       from "./pages/AdminDashboardPage";
@@ -51,6 +56,8 @@ import AdminNotificationsPage   from "./pages/AdminNotificationsPage";
 import AdminAuditPage           from "./pages/AdminAuditPage";
 import AdminCGPAPage            from "./pages/AdminCGPAPage";
 import AdminAttendancePage      from "./pages/AdminAttendancePage";
+import AdminCommunicationPage   from "./pages/AdminCommunicationPage";
+import AdminEventsPage          from "./pages/AdminEventsPage";
 
 // ── Layout / Guards ───────────────────────────────────────────────────────────
 import Layout         from "./components/common/Layout";
@@ -65,11 +72,7 @@ function App() {
   useEffect(() => { dispatch(fetchCurrentUser()); }, [dispatch]);
 
   if (!isInitialized) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-surface-50">
-        <LoadingSpinner size="lg" />
-      </div>
-    );
+    return <PageLoader />;
   }
 
   return (
@@ -140,6 +143,19 @@ function App() {
           {/* Contests */}
           <Route path="/contests"          element={<ContestsPage />} />
           <Route path="/contests/:id"      element={<ContestDetailPage />} />
+
+          {/* Saved Content */}
+          <Route path="/saved"             element={<SavedContentPage />} />
+
+          {/* Settings */}
+          <Route path="/settings"          element={<SettingsPage />} />
+
+          {/* Communication */}
+          <Route path="/communication"     element={<CommunicationPage />} />
+
+          {/* Events */}
+          <Route path="/events"            element={<EventsPage />} />
+          <Route path="/events/:slug"      element={<EventDetailPage />} />
         </Route>
       </Route>
 
@@ -156,6 +172,8 @@ function App() {
           <Route path="/admin/notifications"    element={<AdminNotificationsPage />} />
           <Route path="/admin/cgpa"             element={<AdminCGPAPage />} />
           <Route path="/admin/attendance"       element={<AdminAttendancePage />} />
+          <Route path="/admin/communication"    element={<AdminCommunicationPage />} />
+          <Route path="/admin/events"           element={<AdminEventsPage />} />
           <Route path="/admin/audit"            element={<AdminAuditPage />} />
         </Route>
       </Route>

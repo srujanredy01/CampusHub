@@ -9,6 +9,66 @@
     <link rel="stylesheet" href="/assets/css/components.css">
     <link rel="stylesheet" href="/assets/css/utilities.css">
     <link rel="stylesheet" href="/assets/css/layout.css">
+    <link rel="stylesheet" href="/assets/css/sidebar.css">
+    <style>
+        .settings-layout { display: grid; grid-template-columns: 220px 1fr; gap: var(--space-6); }
+        .settings-nav { display: flex; flex-direction: column; gap: var(--space-1); position: sticky; top: var(--space-4); }
+        .settings-nav-item {
+            display: flex; align-items: center; gap: var(--space-2-5);
+            padding: var(--space-2) var(--space-3); border-radius: var(--radius-lg);
+            font-size: var(--text-sm); color: var(--gray-600); cursor: pointer;
+            transition: all var(--transition-fast); border: none; background: transparent; text-align: left;
+        }
+        .settings-nav-item:hover { background: var(--gray-50); color: var(--gray-900); }
+        .settings-nav-item.active { background: var(--primary-50); color: var(--primary-700); font-weight: var(--font-medium); }
+        .settings-nav-item.danger { color: var(--red-600); }
+        .settings-nav-item.danger:hover { background: var(--red-50); }
+        .settings-section { display: none; }
+        .settings-section.active { display: block; }
+        .settings-card { background: var(--surface-primary); border: 1px solid var(--border-secondary); border-radius: var(--radius-xl); padding: var(--space-6); margin-bottom: var(--space-4); }
+        .settings-card h3 { font-size: var(--text-base); font-weight: var(--font-semibold); color: var(--gray-900); margin-bottom: var(--space-4); }
+        .settings-card p.desc { font-size: var(--text-sm); color: var(--gray-500); margin-bottom: var(--space-4); }
+        .setting-row { display: flex; align-items: center; justify-content: space-between; padding: var(--space-3) 0; border-bottom: 1px solid var(--border-secondary); }
+        .setting-row:last-child { border-bottom: none; }
+        .setting-info h5 { font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--gray-800); }
+        .setting-info p { font-size: var(--text-xs); color: var(--gray-500); margin-top: 2px; }
+        .toggle-switch { position: relative; width: 40px; height: 22px; background: var(--gray-300); border-radius: var(--radius-full); cursor: pointer; transition: background var(--transition-fast); flex-shrink: 0; }
+        .toggle-switch.active { background: var(--primary-600); }
+        .toggle-switch::after { content: ''; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; background: white; border-radius: 50%; transition: transform var(--transition-fast); box-shadow: var(--shadow-sm); }
+        .toggle-switch.active::after { transform: translateX(18px); }
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
+        .form-group { margin-bottom: var(--space-4); }
+        .form-group label { display: block; font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--gray-700); margin-bottom: var(--space-1-5); }
+        .form-input { width: 100%; padding: var(--space-2-5) var(--space-3); border: 1px solid var(--border-primary); border-radius: var(--radius-lg); font-size: var(--text-sm); background: var(--surface-primary); transition: border-color var(--transition-fast); }
+        .form-input:focus { outline: none; border-color: var(--primary-500); box-shadow: 0 0 0 3px var(--primary-100); }
+        .form-input:disabled { background: var(--gray-50); color: var(--gray-500); cursor: not-allowed; }
+        .password-strength { height: 4px; border-radius: 2px; margin-top: var(--space-1); background: var(--gray-200); overflow: hidden; }
+        .password-strength-bar { height: 100%; border-radius: 2px; transition: width 0.3s, background 0.3s; }
+        .theme-options { display: flex; gap: var(--space-3); }
+        .theme-option { flex: 1; padding: var(--space-3); border: 2px solid var(--border-primary); border-radius: var(--radius-lg); text-align: center; cursor: pointer; transition: all var(--transition-fast); }
+        .theme-option:hover { border-color: var(--primary-300); }
+        .theme-option.active { border-color: var(--primary-600); background: var(--primary-50); }
+        .theme-option-icon { font-size: 24px; margin-bottom: var(--space-1); }
+        .theme-option-label { font-size: var(--text-xs); font-weight: var(--font-medium); color: var(--gray-700); }
+        .session-item { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3); border: 1px solid var(--border-secondary); border-radius: var(--radius-lg); margin-bottom: var(--space-2); }
+        .session-icon { width: 36px; height: 36px; border-radius: var(--radius-md); background: var(--gray-100); display: flex; align-items: center; justify-content: center; }
+        .session-info { flex: 1; }
+        .session-info h6 { font-size: var(--text-sm); font-weight: var(--font-medium); color: var(--gray-800); }
+        .session-info p { font-size: var(--text-xs); color: var(--gray-500); }
+        .danger-zone { border-color: var(--red-200); }
+        .danger-zone h3 { color: var(--red-700); }
+        .btn-danger { background: var(--red-600); color: white; border: none; padding: var(--space-2) var(--space-4); border-radius: var(--radius-lg); font-size: var(--text-sm); cursor: pointer; transition: background var(--transition-fast); }
+        .btn-danger:hover { background: var(--red-700); }
+        .btn-outline-danger { background: transparent; color: var(--red-600); border: 1px solid var(--red-300); padding: var(--space-2) var(--space-4); border-radius: var(--radius-lg); font-size: var(--text-sm); cursor: pointer; }
+        .btn-outline-danger:hover { background: var(--red-50); }
+        @media (max-width: 768px) {
+            .settings-layout { grid-template-columns: 1fr; }
+            .settings-nav { flex-direction: row; overflow-x: auto; position: static; gap: var(--space-0-5); padding-bottom: var(--space-2); }
+            .settings-nav-item { white-space: nowrap; padding: var(--space-1-5) var(--space-2-5); font-size: var(--text-xs); }
+            .form-grid { grid-template-columns: 1fr; }
+            .theme-options { flex-wrap: wrap; }
+        }
+    </style>
 </head>
 <body>
     <div class="app-layout" id="app"></div>
@@ -16,108 +76,478 @@
     <script src="/assets/js/api.js"></script>
     <script src="/assets/js/auth.js"></script>
     <script src="/assets/js/utils.js"></script>
+    <script src="/assets/js/sidebar.js"></script>
     <script src="/assets/js/components.js"></script>
     <script>
         if (!Auth.requireAuth()) throw new Error('Not authenticated');
         Components.initLayout('settings', 'Settings');
-        loadSettings();
 
-        function loadSettings() {
+        let settings = {};
+        let sessions = [];
+        let currentSection = 'account';
+
+        init();
+
+        async function init() {
+            renderPage();
+            await loadSettings();
+        }
+
+        async function loadSettings() {
+            try {
+                const res = await API.get('/settings/');
+                settings = res.data || {};
+                renderSections();
+            } catch (e) {
+                Toast.error('Failed to load settings');
+                // Fallback to local user data
+                settings = { account: Auth.getUser(), theme: localStorage.getItem('theme') || 'system' };
+                renderSections();
+            }
+        }
+
+        function renderPage() {
             const content = document.getElementById('pageContent');
-            const user = Auth.getUser();
-
             content.innerHTML = `
             <div class="animate-fade-in">
-                <!-- Profile Settings -->
-                <div class="card mb-6">
-                    <h3 class="card-title mb-4">Profile Information</h3>
-                    <form onsubmit="updateProfile(event)">
-                        <div class="grid grid-cols-2 gap-4">
-                            <div class="form-group"><label class="form-label">Full Name</label><input type="text" id="sName" class="form-input" value="${Utils.escapeHtml(user?.full_name || '')}"></div>
-                            <div class="form-group"><label class="form-label">Email</label><input type="email" class="form-input" value="${Utils.escapeHtml(user?.email || '')}" disabled></div>
-                            <div class="form-group"><label class="form-label">Phone</label><input type="tel" id="sPhone" class="form-input" value="${Utils.escapeHtml(user?.phone || '')}"></div>
-                            <div class="form-group"><label class="form-label">Branch</label><input type="text" id="sBranch" class="form-input" value="${Utils.escapeHtml(user?.branch || '')}"></div>
-                            <div class="form-group"><label class="form-label">Section</label><input type="text" id="sSection" class="form-input" value="${Utils.escapeHtml(user?.section || '')}"></div>
-                            <div class="form-group"><label class="form-label">Batch</label><input type="text" id="sBatch" class="form-input" value="${Utils.escapeHtml(user?.batch || '')}"></div>
-                        </div>
-                        <button type="submit" class="btn btn-primary mt-4">Save Changes</button>
-                    </form>
+                <div class="page-header mb-6">
+                    <h2 class="page-title">Settings</h2>
+                    <p class="page-subtitle">Manage your account, preferences, and privacy</p>
                 </div>
-
-                <!-- Change Password -->
-                <div class="card mb-6">
-                    <h3 class="card-title mb-4">Change Password</h3>
-                    <form onsubmit="changePassword(event)">
-                        <div class="grid grid-cols-3 gap-4">
-                            <div class="form-group"><label class="form-label">Current Password</label><input type="password" id="oldPass" class="form-input" required></div>
-                            <div class="form-group"><label class="form-label">New Password</label><input type="password" id="newPass" class="form-input" required></div>
-                            <div class="form-group"><label class="form-label">Confirm New Password</label><input type="password" id="confirmPass" class="form-input" required></div>
-                        </div>
-                        <button type="submit" class="btn btn-primary mt-4">Update Password</button>
-                    </form>
-                </div>
-
-                <!-- Notification Preferences -->
-                <div class="card mb-6">
-                    <h3 class="card-title mb-4">Notification Preferences</h3>
-                    <div class="flex flex-col gap-4">
-                        <label class="flex items-center justify-between">
-                            <span class="text-sm">Email notifications</span>
-                            <input type="checkbox" checked>
-                        </label>
-                        <label class="flex items-center justify-between">
-                            <span class="text-sm">Assignment reminders</span>
-                            <input type="checkbox" checked>
-                        </label>
-                        <label class="flex items-center justify-between">
-                            <span class="text-sm">Contest alerts</span>
-                            <input type="checkbox" checked>
-                        </label>
-                        <label class="flex items-center justify-between">
-                            <span class="text-sm">News updates</span>
-                            <input type="checkbox" checked>
-                        </label>
+                <div class="settings-layout">
+                    <div class="settings-nav" id="settingsNav">
+                        <button class="settings-nav-item active" onclick="showSection('account', this)">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                            Account
+                        </button>
+                        <button class="settings-nav-item" onclick="showSection('password', this)">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                            Password
+                        </button>
+                        <button class="settings-nav-item" onclick="showSection('notifications', this)">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+                            Notifications
+                        </button>
+                        <button class="settings-nav-item" onclick="showSection('privacy', this)">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                            Privacy
+                        </button>
+                        <button class="settings-nav-item" onclick="showSection('security', this)">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/><circle cx="12" cy="16" r="1"/></svg>
+                            Security
+                        </button>
+                        <button class="settings-nav-item" onclick="showSection('appearance', this)">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/></svg>
+                            Appearance
+                        </button>
+                        <button class="settings-nav-item" onclick="showSection('language', this)">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                            Language
+                        </button>
+                        <button class="settings-nav-item danger" onclick="showSection('danger', this)">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                            Danger Zone
+                        </button>
                     </div>
-                </div>
-
-                <!-- Danger Zone -->
-                <div class="card" style="border-color:var(--danger-200)">
-                    <h3 class="card-title mb-4 text-danger">Danger Zone</h3>
-                    <button class="btn btn-danger" onclick="Auth.logout()">Logout from all devices</button>
+                    <div id="settingsContent"></div>
                 </div>
             </div>`;
         }
 
-        async function updateProfile(e) {
-            e.preventDefault();
-            try {
-                await API.put('/profile', {
-                    full_name: document.getElementById('sName').value,
-                    phone: document.getElementById('sPhone').value,
-                    branch: document.getElementById('sBranch').value,
-                    section: document.getElementById('sSection').value,
-                    batch: document.getElementById('sBatch').value,
-                });
-                Toast.success('Profile updated!');
-                await Auth.fetchCurrentUser();
-            } catch (e) { Toast.error(e.message); }
+        function renderSections() {
+            const container = document.getElementById('settingsContent');
+            const user = settings.account || Auth.getUser() || {};
+            const theme = settings.theme || localStorage.getItem('theme') || 'system';
+
+            container.innerHTML = `
+                <!-- Account Section -->
+                <div class="settings-section active" id="section-account">
+                    <div class="settings-card">
+                        <h3>Account Information</h3>
+                        <p class="desc">Update your personal details and contact information.</p>
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label>Full Name</label>
+                                <input class="form-input" id="settFullName" value="${Utils.escapeHtml(user.full_name || '')}">
+                            </div>
+                            <div class="form-group">
+                                <label>Email</label>
+                                <input class="form-input" value="${Utils.escapeHtml(user.email || '')}" disabled>
+                            </div>
+                            <div class="form-group">
+                                <label>Phone</label>
+                                <input class="form-input" id="settPhone" value="${Utils.escapeHtml(user.phone || '')}" placeholder="+91 XXXXX XXXXX">
+                            </div>
+                            <div class="form-group">
+                                <label>Student ID</label>
+                                <input class="form-input" value="${Utils.escapeHtml(user.student_id || '')}" disabled>
+                            </div>
+                            <div class="form-group">
+                                <label>Branch</label>
+                                <input class="form-input" id="settBranch" value="${Utils.escapeHtml(user.branch || '')}">
+                            </div>
+                            <div class="form-group">
+                                <label>Section</label>
+                                <input class="form-input" id="settSection" value="${Utils.escapeHtml(user.section || '')}">
+                            </div>
+                        </div>
+                        <button class="btn btn-primary btn-sm" onclick="saveAccountSettings()">Save Changes</button>
+                    </div>
+                </div>
+
+                <!-- Password Section -->
+                <div class="settings-section" id="section-password">
+                    <div class="settings-card">
+                        <h3>Change Password</h3>
+                        <p class="desc">Ensure your account stays secure by using a strong password.</p>
+                        <div class="form-group">
+                            <label>Current Password</label>
+                            <input class="form-input" type="password" id="oldPassword" placeholder="Enter current password">
+                        </div>
+                        <div class="form-group">
+                            <label>New Password</label>
+                            <input class="form-input" type="password" id="newPassword" placeholder="Enter new password" oninput="checkPasswordStrength(this.value)">
+                            <div class="password-strength"><div class="password-strength-bar" id="pwStrengthBar"></div></div>
+                            <span style="font-size:11px;color:var(--gray-500);" id="pwStrengthText"></span>
+                        </div>
+                        <div class="form-group">
+                            <label>Confirm New Password</label>
+                            <input class="form-input" type="password" id="confirmPassword" placeholder="Confirm new password">
+                        </div>
+                        <button class="btn btn-primary btn-sm" onclick="changePassword()">Update Password</button>
+                    </div>
+                </div>
+
+                <!-- Notifications Section -->
+                <div class="settings-section" id="section-notifications">
+                    <div class="settings-card">
+                        <h3>Notification Preferences</h3>
+                        <p class="desc">Choose what notifications you want to receive.</p>
+                        <div class="setting-row">
+                            <div class="setting-info"><h5>Coding Alerts</h5><p>New problems and daily challenges</p></div>
+                            <div class="toggle-switch ${settings.coding_alerts !== false ? 'active' : ''}" data-key="coding_alerts" onclick="toggleSetting(this)"></div>
+                        </div>
+                        <div class="setting-row">
+                            <div class="setting-info"><h5>Contest Reminders</h5><p>Upcoming contest notifications</p></div>
+                            <div class="toggle-switch ${settings.contest_reminders !== false ? 'active' : ''}" data-key="contest_reminders" onclick="toggleSetting(this)"></div>
+                        </div>
+                        <div class="setting-row">
+                            <div class="setting-info"><h5>Assignment Reminders</h5><p>Deadline and submission reminders</p></div>
+                            <div class="toggle-switch ${settings.assignment_reminders !== false ? 'active' : ''}" data-key="assignment_reminders" onclick="toggleSetting(this)"></div>
+                        </div>
+                        <div class="setting-row">
+                            <div class="setting-info"><h5>Placement Updates</h5><p>New opportunities and status changes</p></div>
+                            <div class="toggle-switch ${settings.placement_updates !== false ? 'active' : ''}" data-key="placement_updates" onclick="toggleSetting(this)"></div>
+                        </div>
+                        <div class="setting-row">
+                            <div class="setting-info"><h5>News Updates</h5><p>Campus news and announcements</p></div>
+                            <div class="toggle-switch ${settings.news_updates !== false ? 'active' : ''}" data-key="news_updates" onclick="toggleSetting(this)"></div>
+                        </div>
+                        <div class="setting-row">
+                            <div class="setting-info"><h5>Email Notifications</h5><p>Receive updates via email</p></div>
+                            <div class="toggle-switch ${settings.email_notifications !== false ? 'active' : ''}" data-key="email_notifications" onclick="toggleSetting(this)"></div>
+                        </div>
+                        <div class="setting-row">
+                            <div class="setting-info"><h5>Push Notifications</h5><p>Browser push notifications</p></div>
+                            <div class="toggle-switch ${settings.push_notifications !== false ? 'active' : ''}" data-key="push_notifications" onclick="toggleSetting(this)"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Privacy Section -->
+                <div class="settings-section" id="section-privacy">
+                    <div class="settings-card">
+                        <h3>Privacy Settings</h3>
+                        <p class="desc">Control who can see your profile and activity.</p>
+                        <div class="setting-row">
+                            <div class="setting-info"><h5>Profile Visibility</h5><p>Allow others to view your profile</p></div>
+                            <div class="toggle-switch ${settings.profile_visibility !== false ? 'active' : ''}" data-key="profile_visibility" onclick="toggleSetting(this)"></div>
+                        </div>
+                        <div class="setting-row">
+                            <div class="setting-info"><h5>Show Coding Profile</h5><p>Display your coding stats publicly</p></div>
+                            <div class="toggle-switch ${settings.show_coding_profile !== false ? 'active' : ''}" data-key="show_coding_profile" onclick="toggleSetting(this)"></div>
+                        </div>
+                        <div class="setting-row">
+                            <div class="setting-info"><h5>Show Achievements</h5><p>Display badges and achievements on profile</p></div>
+                            <div class="toggle-switch ${settings.show_achievements !== false ? 'active' : ''}" data-key="show_achievements" onclick="toggleSetting(this)"></div>
+                        </div>
+                        <div class="setting-row">
+                            <div class="setting-info"><h5>Leaderboard Visibility</h5><p>Appear on public leaderboards</p></div>
+                            <div class="toggle-switch ${settings.leaderboard_visibility !== false ? 'active' : ''}" data-key="leaderboard_visibility" onclick="toggleSetting(this)"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Security Section -->
+                <div class="settings-section" id="section-security">
+                    <div class="settings-card">
+                        <h3>Active Sessions</h3>
+                        <p class="desc">Manage your active login sessions across devices.</p>
+                        <div id="sessionsList">
+                            <div style="text-align:center;padding:var(--space-4);color:var(--gray-400);font-size:var(--text-sm);">Loading sessions...</div>
+                        </div>
+                        <div style="margin-top:var(--space-4);">
+                            <button class="btn-outline-danger" onclick="logoutAllDevices()">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:inline;vertical-align:middle;margin-right:4px;"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                                Logout All Devices
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Appearance Section -->
+                <div class="settings-section" id="section-appearance">
+                    <div class="settings-card">
+                        <h3>Appearance</h3>
+                        <p class="desc">Customize how CampusHub looks for you.</p>
+                        <div class="theme-options">
+                            <div class="theme-option ${theme === 'light' ? 'active' : ''}" onclick="setTheme('light', this)">
+                                <div class="theme-option-icon">☀️</div>
+                                <div class="theme-option-label">Light</div>
+                            </div>
+                            <div class="theme-option ${theme === 'dark' ? 'active' : ''}" onclick="setTheme('dark', this)">
+                                <div class="theme-option-icon">🌙</div>
+                                <div class="theme-option-label">Dark</div>
+                            </div>
+                            <div class="theme-option ${theme === 'system' ? 'active' : ''}" onclick="setTheme('system', this)">
+                                <div class="theme-option-icon">💻</div>
+                                <div class="theme-option-label">System</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Language Section -->
+                <div class="settings-section" id="section-language">
+                    <div class="settings-card">
+                        <h3>Language Preference</h3>
+                        <p class="desc">Choose your preferred language for the interface.</p>
+                        <div class="form-group">
+                            <select class="form-input" id="settLanguage" onchange="saveLanguage(this.value)" style="max-width:300px;">
+                                <option value="en" ${settings.language === 'en' ? 'selected' : ''}>English</option>
+                                <option value="hi" ${settings.language === 'hi' ? 'selected' : ''}>Hindi</option>
+                                <option value="te" ${settings.language === 'te' ? 'selected' : ''}>Telugu</option>
+                                <option value="ta" ${settings.language === 'ta' ? 'selected' : ''}>Tamil</option>
+                                <option value="kn" ${settings.language === 'kn' ? 'selected' : ''}>Kannada</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Danger Zone -->
+                <div class="settings-section" id="section-danger">
+                    <div class="settings-card danger-zone">
+                        <h3>⚠️ Danger Zone</h3>
+                        <p class="desc">These actions are irreversible. Please proceed with caution.</p>
+                        <div class="setting-row">
+                            <div class="setting-info">
+                                <h5>Deactivate Account</h5>
+                                <p>Temporarily disable your account. You can reactivate by contacting support.</p>
+                            </div>
+                            <button class="btn-outline-danger" onclick="deactivateAccount()">Deactivate</button>
+                        </div>
+                        <div class="setting-row">
+                            <div class="setting-info">
+                                <h5>Delete Account</h5>
+                                <p>Permanently delete your account and all associated data. This cannot be undone.</p>
+                            </div>
+                            <button class="btn-danger" onclick="deleteAccount()">Delete Account</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            // Load sessions
+            loadSessions();
         }
 
-        async function changePassword(e) {
-            e.preventDefault();
-            const newPass = document.getElementById('newPass').value;
-            const confirmPass = document.getElementById('confirmPass').value;
-            if (newPass !== confirmPass) { Toast.error('Passwords do not match'); return; }
+        function showSection(id, btn) {
+            document.querySelectorAll('.settings-section').forEach(s => s.classList.remove('active'));
+            document.querySelectorAll('.settings-nav-item').forEach(n => n.classList.remove('active'));
+            document.getElementById('section-' + id).classList.add('active');
+            btn.classList.add('active');
+            currentSection = id;
+        }
 
+        async function saveAccountSettings() {
+            const data = {
+                full_name: document.getElementById('settFullName').value.trim(),
+                phone: document.getElementById('settPhone').value.trim(),
+                branch: document.getElementById('settBranch').value.trim(),
+                section: document.getElementById('settSection').value.trim(),
+            };
+            if (!data.full_name) { Toast.error('Full name is required'); return; }
             try {
-                await Auth.changePassword(
-                    document.getElementById('oldPass').value,
-                    newPass,
-                    confirmPass
-                );
-                Toast.success('Password changed! Please log in again.');
-                setTimeout(() => Auth.logout(), 2000);
-            } catch (e) { Toast.error(e.message); }
+                await API.patch('/settings/', data);
+                Toast.success('Account updated successfully');
+                // Update local user data
+                const user = Auth.getUser();
+                if (user) {
+                    Object.assign(user, data);
+                    localStorage.setItem(Config.USER_KEY, JSON.stringify(user));
+                }
+            } catch (e) {
+                Toast.error(e.message || 'Failed to update account');
+            }
+        }
+
+        async function changePassword() {
+            const oldPw = document.getElementById('oldPassword').value;
+            const newPw = document.getElementById('newPassword').value;
+            const confirmPw = document.getElementById('confirmPassword').value;
+            if (!oldPw || !newPw || !confirmPw) { Toast.error('All password fields are required'); return; }
+            if (newPw !== confirmPw) { Toast.error('New passwords do not match'); return; }
+            if (newPw.length < 8) { Toast.error('Password must be at least 8 characters'); return; }
+            try {
+                await API.post('/settings/change-password', { old_password: oldPw, new_password: newPw, new_password_confirm: confirmPw });
+                Toast.success('Password changed successfully');
+                document.getElementById('oldPassword').value = '';
+                document.getElementById('newPassword').value = '';
+                document.getElementById('confirmPassword').value = '';
+                document.getElementById('pwStrengthBar').style.width = '0';
+                document.getElementById('pwStrengthText').textContent = '';
+            } catch (e) {
+                Toast.error(e.data?.error?.message || e.data?.errors?.new_password?.[0] || 'Failed to change password');
+            }
+        }
+
+        function checkPasswordStrength(pw) {
+            const bar = document.getElementById('pwStrengthBar');
+            const text = document.getElementById('pwStrengthText');
+            let score = 0;
+            if (pw.length >= 8) score++;
+            if (pw.length >= 12) score++;
+            if (/[A-Z]/.test(pw)) score++;
+            if (/[0-9]/.test(pw)) score++;
+            if (/[^A-Za-z0-9]/.test(pw)) score++;
+            const levels = ['', 'Weak', 'Fair', 'Good', 'Strong', 'Very Strong'];
+            const colors = ['', '#ef4444', '#f59e0b', '#eab308', '#22c55e', '#16a34a'];
+            const widths = ['0%', '20%', '40%', '60%', '80%', '100%'];
+            bar.style.width = widths[score];
+            bar.style.background = colors[score];
+            text.textContent = levels[score];
+            text.style.color = colors[score];
+        }
+
+        async function toggleSetting(el) {
+            el.classList.toggle('active');
+            const key = el.getAttribute('data-key');
+            const value = el.classList.contains('active');
+            try {
+                await API.patch('/settings/', { [key]: value });
+                settings[key] = value;
+            } catch (e) {
+                el.classList.toggle('active'); // revert
+                Toast.error('Failed to update setting');
+            }
+        }
+
+        function setTheme(theme, el) {
+            document.querySelectorAll('.theme-option').forEach(o => o.classList.remove('active'));
+            el.classList.add('active');
+            if (theme === 'system') {
+                const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                document.documentElement.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
+            } else {
+                document.documentElement.setAttribute('data-theme', theme);
+            }
+            localStorage.setItem('theme', theme);
+            // Persist to backend
+            API.patch('/settings/', { theme: theme }).catch(() => {});
+        }
+
+        async function saveLanguage(lang) {
+            try {
+                await API.patch('/settings/', { language: lang });
+                Toast.success('Language preference saved');
+            } catch (e) {
+                Toast.error('Failed to save language preference');
+            }
+        }
+
+        async function loadSessions() {
+            try {
+                const res = await API.get('/settings/sessions');
+                sessions = res.data || [];
+                renderSessions();
+            } catch (e) {
+                document.getElementById('sessionsList').innerHTML = `
+                    <div class="session-item">
+                        <div class="session-icon">🖥️</div>
+                        <div class="session-info">
+                            <h6>Current Session</h6>
+                            <p>Active now</p>
+                        </div>
+                        <span style="font-size:var(--text-xs);color:var(--green-600);font-weight:var(--font-medium);">Active</span>
+                    </div>`;
+            }
+        }
+
+        function renderSessions() {
+            const container = document.getElementById('sessionsList');
+            if (!sessions.length) {
+                container.innerHTML = `
+                    <div class="session-item">
+                        <div class="session-icon">🖥️</div>
+                        <div class="session-info"><h6>Current Session</h6><p>Active now</p></div>
+                        <span style="font-size:var(--text-xs);color:var(--green-600);font-weight:var(--font-medium);">Active</span>
+                    </div>`;
+                return;
+            }
+            container.innerHTML = sessions.map(s => `
+                <div class="session-item">
+                    <div class="session-icon">${s.device?.includes('Mobile') ? '📱' : '🖥️'}</div>
+                    <div class="session-info">
+                        <h6>${Utils.escapeHtml(s.device || 'Unknown Device')}</h6>
+                        <p>${s.ip_address || 'Unknown IP'} • ${s.location || 'Unknown location'} • ${Utils.timeAgo(s.last_active)}</p>
+                    </div>
+                    <span style="font-size:var(--text-xs);color:${s.is_active ? 'var(--green-600)' : 'var(--gray-400)'};font-weight:var(--font-medium);">${s.is_active ? 'Active' : 'Expired'}</span>
+                </div>
+            `).join('');
+        }
+
+        async function logoutAllDevices() {
+            if (!confirm('This will log you out from all devices including this one. Continue?')) return;
+            try {
+                await API.post('/settings/logout-all');
+                Toast.success('Logged out from all devices');
+                setTimeout(() => Auth.logout(), 1500);
+            } catch (e) {
+                Toast.error('Failed to logout all devices');
+            }
+        }
+
+        async function deactivateAccount() {
+            const password = prompt('Enter your password to deactivate your account:');
+            if (!password) return;
+            if (!confirm('Are you sure you want to deactivate your account? Type "deactivate" in the next prompt to confirm.')) return;
+            const confirmation = prompt('Type "deactivate" to confirm:');
+            if (confirmation?.toLowerCase() !== 'deactivate') { Toast.error('Confirmation failed'); return; }
+            try {
+                await API.post('/settings/deactivate', { password, confirmation: 'deactivate' });
+                Toast.success('Account deactivated');
+                setTimeout(() => Auth.logout(), 1500);
+            } catch (e) {
+                Toast.error(e.data?.error?.message || 'Failed to deactivate account');
+            }
+        }
+
+        async function deleteAccount() {
+            const password = prompt('Enter your password to permanently delete your account:');
+            if (!password) return;
+            if (!confirm('⚠️ WARNING: This will permanently delete your account and ALL data. This CANNOT be undone.')) return;
+            const confirmation = prompt('Type "delete my account" to confirm permanent deletion:');
+            if (confirmation?.toLowerCase() !== 'delete my account') { Toast.error('Confirmation failed'); return; }
+            try {
+                await API.request('/settings/delete', {
+                    method: 'DELETE',
+                    body: JSON.stringify({ password, confirmation: 'delete my account' }),
+                });
+                Toast.success('Account deleted');
+                localStorage.clear();
+                setTimeout(() => window.location.href = '/pages/auth/login.html', 1500);
+            } catch (e) {
+                Toast.error(e.data?.error?.message || 'Failed to delete account');
+            }
         }
     </script>
 </body>

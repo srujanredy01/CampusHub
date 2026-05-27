@@ -50,6 +50,8 @@ _ACTION_MAP = {
     "/api/groups/":             "page_visit",
     "/api/placement/":          "page_visit",
     "/api/attendance/":         "page_visit",
+    "/api/communication/":      "page_visit",
+    "/api/events/":             "page_visit",
 }
 
 

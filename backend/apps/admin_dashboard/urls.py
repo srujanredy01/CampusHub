@@ -56,6 +56,15 @@ from apps.assignments.views import (
     AdminAssignmentCreateView, AdminAssignmentDetailView,
     AdminAssignmentSubmissionsView, AdminAssignmentGradeView,
 )
+from apps.communication.views import (
+    AdminChannelListView, AdminAllMessagesView, AdminDMListView,
+    AdminReportsView, AdminResolveReportView, AdminModerationLogView,
+    AdminOnlineUsersView, AdminCommStatsView,
+)
+from apps.events.views import (
+    AdminEventListView, AdminEventDetailView, AdminEventRegistrationsView,
+    AdminEventStatsView, AdminAllCertificatesView,
+)
 
 urlpatterns = [
     # Dashboard
@@ -145,4 +154,21 @@ urlpatterns = [
     path("assignments/<uuid:pk>",                  AdminAssignmentDetailView.as_view(),        name="admin-assignment-detail"),
     path("assignments/<uuid:pk>/submissions",      AdminAssignmentSubmissionsView.as_view(),   name="admin-assignment-submissions"),
     path("assignments/submissions/<uuid:sub_id>/grade", AdminAssignmentGradeView.as_view(),    name="admin-assignment-grade"),
+
+    # Communication management
+    path("communication/channels",                     AdminChannelListView.as_view(),           name="admin-comm-channels"),
+    path("communication/messages",                     AdminAllMessagesView.as_view(),           name="admin-comm-messages"),
+    path("communication/dms",                          AdminDMListView.as_view(),                name="admin-comm-dms"),
+    path("communication/reports",                      AdminReportsView.as_view(),               name="admin-comm-reports"),
+    path("communication/reports/<uuid:pk>/resolve",    AdminResolveReportView.as_view(),         name="admin-comm-report-resolve"),
+    path("communication/moderation-log",               AdminModerationLogView.as_view(),         name="admin-comm-moderation-log"),
+    path("communication/online-users",                 AdminOnlineUsersView.as_view(),           name="admin-comm-online-users"),
+    path("communication/stats",                        AdminCommStatsView.as_view(),             name="admin-comm-stats"),
+
+    # Events management
+    path("events",                                     AdminEventListView.as_view(),             name="admin-events"),
+    path("events/stats",                               AdminEventStatsView.as_view(),            name="admin-events-stats"),
+    path("events/certificates",                        AdminAllCertificatesView.as_view(),       name="admin-events-certificates"),
+    path("events/<slug:slug>",                         AdminEventDetailView.as_view(),           name="admin-event-detail"),
+    path("events/<slug:slug>/registrations",           AdminEventRegistrationsView.as_view(),    name="admin-event-registrations"),
 ]

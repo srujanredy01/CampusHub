@@ -55,7 +55,7 @@ export function useNotificationWebSocket() {
 
   const connectAdmin = useCallback(() => {
     const token = localStorage.getItem("access_token");
-    if (!token || !isAuthenticated || user?.role !== "admin") return;
+    if (!token || !isAuthenticated || !["admin", "super_admin"].includes(user?.role)) return;
 
     adminNotificationWS.connect("/ws/admin/notifications/", token);
 
@@ -86,7 +86,7 @@ export function useNotificationWebSocket() {
       connectedRef.current = true;
       connectUser();
 
-      if (user?.role === "admin") {
+      if (["admin", "super_admin"].includes(user?.role)) {
         connectAdmin();
       }
     }

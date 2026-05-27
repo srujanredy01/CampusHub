@@ -158,6 +158,23 @@ class AdminDashboardView(APIView):
             .values("id", "username", "role", "action", "status", "created_at", "metadata")
         )
 
+        # Communication & Events stats
+        try:
+            from apps.communication.models import Channel, Message, UserPresence
+            comm_channels = Channel.objects.filter(is_active=True).count()
+            comm_messages = Message.objects.count()
+            comm_online = UserPresence.objects.filter(status="online").count()
+        except Exception:
+            comm_channels = comm_messages = comm_online = 0
+
+        try:
+            from apps.events.models import Event, EventRegistration
+            events_total = Event.objects.filter(is_active=True).exclude(status="draft").count()
+            events_upcoming = Event.objects.filter(starts_at__gte=now, is_active=True).count()
+            events_registrations = EventRegistration.objects.exclude(status="cancelled").count()
+        except Exception:
+            events_total = events_upcoming = events_registrations = 0
+
         return ok({
             "users": {
                 "total": total_students,
@@ -194,6 +211,16 @@ class AdminDashboardView(APIView):
             "audit": {
                 "admin_actions_7d": audit_actions_7d,
                 "login_failures_7d": login_failures_7d,
+            },
+            "communication": {
+                "channels": comm_channels,
+                "messages": comm_messages,
+                "online_users": comm_online,
+            },
+            "events": {
+                "total": events_total,
+                "upcoming": events_upcoming,
+                "registrations": events_registrations,
             },
             "trends": {
                 "registrations": reg_trend,
@@ -879,11 +906,34 @@ class AdminGlobalSearchView(APIView):
             CodingQuestion.objects.filter(Q(title__icontains=query) | Q(description__icontains=query))
             .values("id", "title", "difficulty", "topic", "is_active")[:10]
         )
+
+        # Communication channels
+        try:
+            from apps.communication.models import Channel
+            channels = list(
+                Channel.objects.filter(Q(name__icontains=query) | Q(description__icontains=query))
+                .values("id", "name", "channel_type", "is_active")[:10]
+            )
+        except Exception:
+            channels = []
+
+        # Events
+        try:
+            from apps.events.models import Event
+            events = list(
+                Event.objects.filter(Q(title__icontains=query) | Q(description__icontains=query))
+                .values("id", "title", "event_type", "status", "starts_at")[:10]
+            )
+        except Exception:
+            events = []
+
         return ok({
             "students": students,
             "notes": notes,
             "news": news,
             "questions": questions,
+            "channels": channels,
+            "events": events,
         })
 
 

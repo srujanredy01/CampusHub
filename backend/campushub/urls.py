@@ -63,6 +63,10 @@ urlpatterns = [
     path("api/leaderboard/",   include("apps.leaderboard.urls")),
     path("api/search/",        include("apps.search.urls")),
     path("api/contests/",      include("apps.contests.urls")),
+    path("api/saved/",         include("apps.saved.urls")),
+    path("api/settings/",      include("apps.settings_app.urls")),
+    path("api/communication/", include("apps.communication.urls")),
+    path("api/events/",        include("apps.events.urls")),
 
     # ── Docs & Metrics ─────────────────────────────────────────────────────
     path("api/schema/",        SpectacularAPIView.as_view(),                        name="schema"),

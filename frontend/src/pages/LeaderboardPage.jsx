@@ -1,108 +1,95 @@
 import { useState, useEffect } from "react";
-import { leaderboardService } from "../services/leaderboardService";
-import { toast } from "react-toastify";
-import LoadingSpinner from "../components/common/LoadingSpinner";
+import { useSelector } from "react-redux";
+import api from "../services/api";
 
 export default function LeaderboardPage() {
-  const [leaderboard, setLeaderboard] = useState([]);
-  const [myXP, setMyXP] = useState(null);
-  const [badges, setBadges] = useState([]);
+  const { user } = useSelector((s) => s.auth);
+  const [leaders, setLeaders] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState("leaderboard");
+  const [period, setPeriod] = useState("all");
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => {
+    const fetch = async () => {
+      try {
+        const res = await api.get("/leaderboard/", { params: { period } });
+        setLeaders(Array.isArray(res.data) ? res.data : res.data.results || []);
+      } catch (err) { console.error(err); }
+      finally { setLoading(false); }
+    };
+    fetch();
+  }, [period]);
 
-  const fetchData = async () => {
-    try {
-      const [lbRes, xpRes, badgeRes] = await Promise.all([
-        leaderboardService.getLeaderboard(),
-        leaderboardService.getMyXP(),
-        leaderboardService.getBadges(),
-      ]);
-      setLeaderboard(lbRes.data.data || []);
-      setMyXP(xpRes.data.data || null);
-      setBadges(badgeRes.data.data || []);
-    } catch { toast.error("Failed to load leaderboard"); }
-    finally { setLoading(false); }
+  const getMedal = (rank) => {
+    if (rank === 1) return "🥇";
+    if (rank === 2) return "🥈";
+    if (rank === 3) return "🥉";
+    return null;
   };
 
-  if (loading) return <LoadingSpinner size="lg" className="mt-20" />;
-
   return (
-    <div className="space-y-6">
-      <div><h1 className="text-2xl font-bold text-gray-900">Leaderboard & Achievements</h1></div>
-
-      {myXP && (
-        <div className="card bg-gradient-to-r from-primary-50 to-purple-50">
-          <div className="flex items-center gap-6">
-            <div className="text-center">
-              <p className="text-3xl font-bold text-primary-600">{myXP.xp?.total_xp || 0}</p>
-              <p className="text-xs text-gray-500">Total XP</p>
-            </div>
-            <div className="text-center">
-              <p className="text-2xl font-bold text-purple-600">Lv.{myXP.xp?.level || 1}</p>
-              <p className="text-xs text-gray-500">Level</p>
-            </div>
-            <div className="text-center">
-              <p className="text-2xl font-bold text-orange-600">#{myXP.xp?.rank || "-"}</p>
-              <p className="text-xs text-gray-500">Rank</p>
-            </div>
-            <div className="text-center">
-              <p className="text-2xl font-bold text-green-600">{myXP.xp?.streak_days || 0}🔥</p>
-              <p className="text-xs text-gray-500">Streak</p>
-            </div>
-            <div className="flex-1 flex flex-wrap gap-1 justify-end">
-              {(myXP.badges || []).map(b => (
-                <span key={b.id} className="text-xl" title={b.badge?.name}>{b.badge?.icon}</span>
-              ))}
-            </div>
-          </div>
+    <div className="page-container space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="page-title">Leaderboard</h1>
+          <p className="page-subtitle">Top coders on CampusHub</p>
         </div>
-      )}
-
-      <div className="flex gap-2 border-b">
-        {["leaderboard", "badges"].map(t => (
-          <button key={t} onClick={() => setTab(t)} className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${tab === t ? "border-primary-500 text-primary-600" : "border-transparent text-gray-500 hover:text-gray-700"}`}>{t === "leaderboard" ? "Rankings" : "Badges"}</button>
-        ))}
-      </div>
-
-      {tab === "leaderboard" && (
-        <div className="card overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50"><tr><th className="px-4 py-3 text-left">#</th><th className="px-4 py-3 text-left">Student</th><th className="px-4 py-3 text-left">Branch</th><th className="px-4 py-3 text-right">XP</th><th className="px-4 py-3 text-right">Level</th><th className="px-4 py-3 text-right">Streak</th></tr></thead>
-            <tbody className="divide-y">
-              {leaderboard.map((entry, idx) => (
-                <tr key={entry.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 font-bold">{idx < 3 ? ["🥇", "🥈", "🥉"][idx] : idx + 1}</td>
-                  <td className="px-4 py-3 font-medium">{entry.student_name}</td>
-                  <td className="px-4 py-3 text-gray-500">{entry.branch}</td>
-                  <td className="px-4 py-3 text-right font-bold text-primary-600">{entry.total_xp}</td>
-                  <td className="px-4 py-3 text-right">{entry.level}</td>
-                  <td className="px-4 py-3 text-right">{entry.streak_days}🔥</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {tab === "badges" && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {badges.map(badge => (
-            <div key={badge.id} className={`card ${badge.earned ? "ring-2 ring-yellow-400" : "opacity-60"}`}>
-              <div className="flex items-center gap-3">
-                <span className="text-3xl">{badge.icon}</span>
-                <div>
-                  <h3 className="font-semibold text-gray-900">{badge.name}</h3>
-                  <p className="text-xs text-gray-500">{badge.description}</p>
-                  <p className="text-xs text-primary-600 mt-1">+{badge.xp_reward} XP</p>
-                </div>
-              </div>
-              {badge.earned && <span className="text-xs text-green-600 font-medium mt-2 block">✓ Earned</span>}
-            </div>
+        <div className="tab-pills">
+          {[{ id: "all", label: "All Time" }, { id: "month", label: "This Month" }, { id: "week", label: "This Week" }].map((t) => (
+            <button key={t.id} onClick={() => setPeriod(t.id)}
+              className={period === t.id ? "tab-pill-active" : "tab-pill-inactive"}>{t.label}</button>
           ))}
         </div>
-      )}
+      </div>
+
+      {/* Leaderboard Table */}
+      <div className="card-flush">
+        <div className="table-head">
+          <div className="flex items-center px-4 py-3">
+            <span className="th w-16">Rank</span>
+            <span className="th flex-1">User</span>
+            <span className="th w-24 text-right">Solved</span>
+            <span className="th w-24 text-right">Score</span>
+          </div>
+        </div>
+        {loading ? (
+          <div className="p-4 space-y-3">
+            {[...Array(10)].map((_, i) => <div key={i} className="skeleton h-12 rounded-lg" />)}
+          </div>
+        ) : leaders.length === 0 ? (
+          <div className="empty-state py-12">
+            <p className="empty-state-title">No data yet</p>
+            <p className="empty-state-desc">Start solving problems to appear on the leaderboard</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-surface-100">
+            {leaders.map((entry, idx) => {
+              const rank = idx + 1;
+              const isMe = entry.user?.id === user?.id || entry.username === user?.username;
+              return (
+                <div key={entry.id || idx} className={`flex items-center px-4 py-3 ${isMe ? "bg-primary-50/50" : "hover:bg-surface-50"} transition-colors`}>
+                  <div className="w-16 flex items-center gap-1">
+                    {getMedal(rank) ? (
+                      <span className="text-lg">{getMedal(rank)}</span>
+                    ) : (
+                      <span className="text-sm font-semibold text-surface-500 tabular-nums">{rank}</span>
+                    )}
+                  </div>
+                  <div className="flex-1 flex items-center gap-2.5 min-w-0">
+                    <div className="avatar-sm text-xs">{(entry.user?.first_name || entry.username || "U")[0]}</div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-surface-800 truncate">
+                        {entry.user?.first_name || entry.username || "User"} {isMe && <span className="text-xs text-primary-600">(You)</span>}
+                      </p>
+                    </div>
+                  </div>
+                  <span className="w-24 text-right text-sm text-surface-600 tabular-nums">{entry.problems_solved || 0}</span>
+                  <span className="w-24 text-right text-sm font-semibold text-surface-800 tabular-nums">{entry.score || 0}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

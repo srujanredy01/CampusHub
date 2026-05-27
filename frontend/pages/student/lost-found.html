@@ -9,6 +9,63 @@
     <link rel="stylesheet" href="/assets/css/components.css">
     <link rel="stylesheet" href="/assets/css/utilities.css">
     <link rel="stylesheet" href="/assets/css/layout.css">
+    <link rel="stylesheet" href="/assets/css/sidebar.css">
+    <style>
+        .lf-card {
+            background: var(--surface-card);
+            border: 1px solid var(--border-primary);
+            border-radius: var(--radius-xl);
+            overflow: hidden;
+            transition: all var(--transition-fast);
+            cursor: pointer;
+        }
+        .lf-card:hover {
+            border-color: var(--gray-300);
+            box-shadow: var(--shadow-md);
+            transform: translateY(-2px);
+        }
+        .lf-image {
+            width: 100%;
+            height: 160px;
+            background: var(--gray-100);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.5rem;
+            color: var(--gray-400);
+            overflow: hidden;
+        }
+        .lf-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .lf-body { padding: var(--space-4); }
+        .lf-title {
+            font-size: var(--text-sm);
+            font-weight: var(--font-semibold);
+            color: var(--gray-900);
+            margin-bottom: var(--space-1);
+        }
+        .lf-location {
+            font-size: var(--text-xs);
+            color: var(--gray-500);
+            display: flex;
+            align-items: center;
+            gap: var(--space-1);
+        }
+        .lf-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: var(--space-3);
+            padding-top: var(--space-3);
+            border-top: 1px solid var(--border-secondary);
+        }
+        .status-lost { background: var(--danger-50); color: var(--danger-700); }
+        .status-found { background: var(--success-50); color: var(--success-700); }
+        .status-claimed { background: var(--gray-100); color: var(--gray-600); }
+    </style>
 </head>
 <body>
     <div class="app-layout" id="app"></div>
@@ -16,115 +73,128 @@
     <script src="/assets/js/api.js"></script>
     <script src="/assets/js/auth.js"></script>
     <script src="/assets/js/utils.js"></script>
+    <script src="/assets/js/sidebar.js"></script>
     <script src="/assets/js/components.js"></script>
     <script>
         if (!Auth.requireAuth()) throw new Error('Not authenticated');
         Components.initLayout('lost-found', 'Lost & Found');
         loadLostFound();
 
+        let lfFilter = '';
+
         async function loadLostFound() {
             const content = document.getElementById('pageContent');
             content.innerHTML = `
             <div class="animate-fade-in">
-                <div class="flex items-center justify-between mb-6">
-                    <div class="search-bar"><span class="search-icon">🔍</span><input type="text" placeholder="Search items..." oninput="debouncedSearch(this.value)"></div>
-                    <button class="btn btn-primary" onclick="showPostModal()">+ Report Item</button>
+                <div class="page-header-row mb-5">
+                    <div>
+                        <h2 class="page-title">Lost & Found</h2>
+                        <p class="page-subtitle">Report or find lost items on campus</p>
+                    </div>
+                    <button class="btn btn-primary btn-sm" onclick="openReportModal()">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                        Report Item
+                    </button>
                 </div>
-                <div class="filter-chips mb-4">
-                    <button class="chip active" onclick="filterItems('all', this)">All</button>
-                    <button class="chip" onclick="filterItems('lost', this)">Lost</button>
-                    <button class="chip" onclick="filterItems('found', this)">Found</button>
-                    <button class="chip" onclick="filterItems('resolved', this)">Resolved</button>
-                </div>
-                <div class="grid grid-cols-3 gap-4" id="itemsGrid">${Components.renderSkeleton('card', 6)}</div>
-            </div>
 
-            <!-- Post Modal -->
-            <div class="modal-overlay" id="postModal" onclick="if(event.target===this)Components.closeModal('postModal')">
-                <div class="modal">
-                    <div class="modal-header"><h3 class="modal-title">Report Item</h3><button class="modal-close" onclick="Components.closeModal('postModal')">✕</button></div>
-                    <div class="modal-body">
-                        <form onsubmit="postItem(event)">
-                            <div class="form-group"><label class="form-label">Type</label><select id="itemType" class="form-input"><option value="lost">Lost</option><option value="found">Found</option></select></div>
-                            <div class="form-group"><label class="form-label">Title</label><input type="text" id="itemTitle" class="form-input" required placeholder="Blue backpack"></div>
-                            <div class="form-group"><label class="form-label">Description</label><textarea id="itemDesc" class="form-input" rows="3" placeholder="Details about the item..."></textarea></div>
-                            <div class="form-group"><label class="form-label">Location</label><input type="text" id="itemLocation" class="form-input" placeholder="Library, Block A..."></div>
-                            <div class="form-group"><label class="form-label">Image</label><input type="file" id="itemImage" class="form-input" accept="image/*"></div>
-                            <button type="submit" class="btn btn-primary w-full">Post</button>
-                        </form>
+                <div class="flex items-center gap-3 mb-5">
+                    <div class="filter-chips">
+                        <button class="chip active" onclick="setLfFilter('', this)">All</button>
+                        <button class="chip" onclick="setLfFilter('lost', this)">Lost</button>
+                        <button class="chip" onclick="setLfFilter('found', this)">Found</button>
+                        <button class="chip" onclick="setLfFilter('claimed', this)">Claimed</button>
                     </div>
                 </div>
+
+                <div class="grid grid-cols-3 gap-4" id="lfGrid">${Components.renderSkeleton('card', 6)}</div>
             </div>`;
-
-            fetchItems();
+            fetchLostFound();
         }
 
-        let allItems = [];
-        let currentFilter = 'all';
+        async function fetchLostFound() {
+            const grid = document.getElementById('lfGrid');
+            const params = { page_size: 12 };
+            if (lfFilter) params.status = lfFilter;
 
-        async function fetchItems(search = '') {
-            const grid = document.getElementById('itemsGrid');
             try {
-                const params = {};
-                if (search) params.search = search;
                 const data = await API.get('/lost-found', params);
-                allItems = data?.data?.results || data?.data || [];
-                renderItems();
-            } catch (e) { grid.innerHTML = `<p class="text-danger">${e.message}</p>`; }
-        }
+                const items = data?.data?.results || data?.data || [];
 
-        function renderItems() {
-            const grid = document.getElementById('itemsGrid');
-            let items = allItems;
-            if (currentFilter !== 'all') items = items.filter(i => i.item_type === currentFilter || i.status === currentFilter);
+                if (items.length === 0) {
+                    grid.innerHTML = `<div class="col-span-full">${Components.renderEmptyState('🔍', 'No items', 'No lost or found items reported yet')}</div>`;
+                    return;
+                }
 
-            if (items.length === 0) {
-                grid.innerHTML = Components.renderEmptyState('🔍', 'No items found', 'No items match your criteria');
-                return;
+                grid.innerHTML = items.map(item => {
+                    const statusClass = item.status?.toLowerCase() === 'lost' ? 'status-lost' : item.status?.toLowerCase() === 'found' ? 'status-found' : 'status-claimed';
+                    return `
+                    <div class="lf-card">
+                        <div class="lf-image">
+                            ${item.image ? `<img src="${item.image}" alt="${Utils.escapeHtml(item.title)}" loading="lazy">` : '📦'}
+                        </div>
+                        <div class="lf-body">
+                            <div class="lf-title">${Utils.escapeHtml(item.title || item.item_name || 'Item')}</div>
+                            <div class="lf-location">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                                ${Utils.escapeHtml(item.location || 'Campus')}
+                            </div>
+                            <div class="lf-footer">
+                                <span class="badge ${statusClass}">${Utils.escapeHtml(item.status || 'Lost')}</span>
+                                <span class="text-2xs text-gray-400">${Utils.timeAgo(item.created_at)}</span>
+                            </div>
+                        </div>
+                    </div>`;
+                }).join('');
+            } catch (e) {
+                grid.innerHTML = `<p class="text-sm text-danger col-span-full">Failed to load items</p>`;
             }
-
-            grid.innerHTML = items.map(item => `
-                <div class="card">
-                    ${item.image ? `<img src="${item.image}" style="width:100%;height:120px;object-fit:cover;border-radius:var(--radius-md);margin-bottom:var(--space-3)" alt="">` : ''}
-                    <div class="flex items-center gap-2 mb-2">
-                        <span class="badge badge-${item.item_type === 'lost' ? 'danger' : 'success'}">${item.item_type === 'lost' ? '🔴 Lost' : '🟢 Found'}</span>
-                        ${item.status === 'resolved' ? '<span class="badge badge-gray">Resolved</span>' : ''}
-                    </div>
-                    <h4 class="font-semibold text-sm">${Utils.escapeHtml(item.title)}</h4>
-                    <p class="text-xs text-gray-500 mt-1">${Utils.escapeHtml(item.location || '')}</p>
-                    <p class="text-xs text-gray-400 mt-2">${Utils.timeAgo(item.created_at)}</p>
-                </div>
-            `).join('');
         }
 
-        function filterItems(filter, btn) {
-            currentFilter = filter;
-            document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+        function setLfFilter(filter, btn) {
+            lfFilter = filter;
+            document.querySelectorAll('.filter-chips .chip').forEach(c => c.classList.remove('active'));
             btn.classList.add('active');
-            renderItems();
+            fetchLostFound();
         }
 
-        function showPostModal() { Components.openModal('postModal'); }
+        function openReportModal() {
+            const id = 'reportModal';
+            if (document.getElementById(id)) { Components.openModal(id); return; }
+            document.body.insertAdjacentHTML('beforeend', `
+            <div class="modal-overlay" id="${id}" onclick="if(event.target===this)Components.closeModal('${id}')">
+                <div class="modal">
+                    <div class="modal-header">
+                        <h3 class="modal-title">Report Item</h3>
+                        <button class="modal-close" onclick="Components.closeModal('${id}')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="form-group"><label class="form-label">Item Name</label><input class="form-input" id="lf-name" placeholder="e.g. Blue Backpack"></div>
+                        <div class="form-group"><label class="form-label">Status</label><select class="form-input" id="lf-status"><option value="lost">Lost</option><option value="found">Found</option></select></div>
+                        <div class="form-group"><label class="form-label">Location</label><input class="form-input" id="lf-location" placeholder="Where was it lost/found?"></div>
+                        <div class="form-group"><label class="form-label">Description</label><textarea class="form-input" id="lf-desc" rows="3" placeholder="Describe the item..."></textarea></div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-secondary btn-sm" onclick="Components.closeModal('${id}')">Cancel</button>
+                        <button class="btn btn-primary btn-sm" onclick="submitReport()">Submit</button>
+                    </div>
+                </div>
+            </div>`);
+            Components.openModal(id);
+        }
 
-        async function postItem(e) {
-            e.preventDefault();
-            const formData = new FormData();
-            formData.append('item_type', document.getElementById('itemType').value);
-            formData.append('title', document.getElementById('itemTitle').value);
-            formData.append('description', document.getElementById('itemDesc').value);
-            formData.append('location', document.getElementById('itemLocation').value);
-            const file = document.getElementById('itemImage').files[0];
-            if (file) formData.append('image', file);
-
+        async function submitReport() {
             try {
-                await API.upload('/lost-found/create', formData);
-                Toast.success('Item posted!');
-                Components.closeModal('postModal');
-                fetchItems();
-            } catch (e) { Toast.error(e.message); }
+                await API.post('/lost-found', {
+                    item_name: document.getElementById('lf-name').value,
+                    status: document.getElementById('lf-status').value,
+                    location: document.getElementById('lf-location').value,
+                    description: document.getElementById('lf-desc').value,
+                });
+                Components.closeModal('reportModal');
+                Toast.success('Item reported successfully');
+                fetchLostFound();
+            } catch (e) { Toast.error(e.message || 'Failed to report'); }
         }
-
-        const debouncedSearch = Utils.debounce((v) => fetchItems(v), 400);
     </script>
 </body>
 </html>

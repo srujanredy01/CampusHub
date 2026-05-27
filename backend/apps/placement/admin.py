@@ -1,29 +1,28 @@
 from django.contrib import admin
-from .models import Company, PlacementApplication, InterviewRound
+from .models import PlacementApplication, InterviewExperience, CompanyNote
 
 
-@admin.register(Company)
-class CompanyAdmin(admin.ModelAdmin):
-    list_display = ["name", "industry", "is_active", "created_at"]
-    list_filter = ["industry", "is_active"]
-    search_fields = ["name", "industry", "website"]
-
-
-class InterviewRoundInline(admin.TabularInline):
-    model = InterviewRound
+class InterviewExperienceInline(admin.TabularInline):
+    model = InterviewExperience
     extra = 0
 
 
 @admin.register(PlacementApplication)
 class PlacementApplicationAdmin(admin.ModelAdmin):
-    list_display = ["student", "company", "role", "status", "package_lpa", "deadline", "reminder_enabled", "updated_at"]
-    list_filter = ["status", "reminder_enabled", "company"]
-    search_fields = ["student__full_name", "student__student_id", "company__name", "role"]
-    inlines = [InterviewRoundInline]
+    list_display = ["student", "company_name", "role", "status", "package_lpa", "deadline", "updated_at"]
+    list_filter = ["status", "job_type"]
+    search_fields = ["student__full_name", "student__student_id", "company_name", "role"]
+    inlines = [InterviewExperienceInline]
 
 
-@admin.register(InterviewRound)
-class InterviewRoundAdmin(admin.ModelAdmin):
-    list_display = ["application", "round_number", "round_type", "result", "round_date"]
+@admin.register(InterviewExperience)
+class InterviewExperienceAdmin(admin.ModelAdmin):
+    list_display = ["application", "round_number", "round_type", "result", "interview_date"]
     list_filter = ["round_type", "result"]
-    search_fields = ["application__company__name", "application__student__full_name"]
+    search_fields = ["application__company_name", "application__student__full_name"]
+
+
+@admin.register(CompanyNote)
+class CompanyNoteAdmin(admin.ModelAdmin):
+    list_display = ["student", "company_name", "updated_at"]
+    search_fields = ["student__full_name", "company_name"]

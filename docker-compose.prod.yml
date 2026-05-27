@@ -143,8 +143,13 @@ services:
     image: campushub-executor:latest
     container_name: campushub_executor
     restart: always
+    environment:
+      - EXECUTOR_WORK_DIR=/tmp/executor
+      - EXECUTOR_MEMORY_MB=192
+      - EXECUTOR_TIMEOUT_SEC=10
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+      - executor_work:/tmp/executor
     networks:
       - campushub_net
     healthcheck:
@@ -159,6 +164,8 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        VITE_API_URL: /api
     image: campushub-frontend:latest
     container_name: campushub_frontend
     restart: always
@@ -196,6 +203,7 @@ volumes:
   media_files:
   backend_logs:
   redis_data:
+  executor_work:
 
 networks:
   campushub_net:

@@ -17,6 +17,7 @@ export default function Modal({
   children,
   maxWidth = "max-w-lg",
   footer = null,
+  icon = null,
 }) {
   const panelRef = useRef(null);
 
@@ -62,13 +63,19 @@ export default function Modal({
         className={`modal-panel ${maxWidth}`}
         onClick={(e) => e.stopPropagation()}
         tabIndex={-1}
-        outline="none"
       >
         {/* Header */}
         <div className="modal-header">
-          <h2 id="modal-title" className="text-base font-bold text-slate-900">
-            {title}
-          </h2>
+          <div className="flex items-center gap-3">
+            {icon && (
+              <div className="w-9 h-9 rounded-xl bg-primary-50 flex items-center justify-center flex-shrink-0">
+                {icon}
+              </div>
+            )}
+            <h2 id="modal-title" className="text-base font-bold text-slate-900">
+              {title}
+            </h2>
+          </div>
           <button
             onClick={onClose}
             className="modal-close"

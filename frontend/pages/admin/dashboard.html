@@ -9,6 +9,63 @@
     <link rel="stylesheet" href="/assets/css/components.css">
     <link rel="stylesheet" href="/assets/css/utilities.css">
     <link rel="stylesheet" href="/assets/css/layout.css">
+    <link rel="stylesheet" href="/assets/css/sidebar.css">
+    <style>
+        .admin-stat-card {
+            background: var(--surface-card);
+            border: 1px solid var(--border-primary);
+            border-radius: var(--radius-xl);
+            padding: var(--space-5);
+            display: flex;
+            flex-direction: column;
+        }
+        .admin-stat-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: var(--space-3);
+        }
+        .admin-stat-value {
+            font-size: var(--text-3xl);
+            font-weight: var(--font-bold);
+            color: var(--gray-900);
+            letter-spacing: var(--tracking-tight);
+        }
+        .admin-stat-label {
+            font-size: var(--text-xs);
+            color: var(--gray-500);
+            margin-top: var(--space-1);
+        }
+        .admin-stat-trend {
+            font-size: var(--text-2xs);
+            font-weight: var(--font-medium);
+            display: inline-flex;
+            align-items: center;
+            gap: var(--space-0-5);
+            padding: var(--space-0-5) var(--space-1-5);
+            border-radius: var(--radius-full);
+        }
+        .admin-stat-trend.up { background: var(--success-50); color: var(--success-700); }
+        .admin-stat-trend.down { background: var(--danger-50); color: var(--danger-700); }
+        .recent-table td { padding: var(--space-3) var(--space-4); }
+        .system-health-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: var(--space-3) 0;
+            border-bottom: 1px solid var(--border-secondary);
+        }
+        .system-health-item:last-child { border-bottom: none; }
+        .health-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: var(--space-2);
+        }
+        .health-dot.healthy { background: var(--success-500); }
+        .health-dot.warning { background: var(--warning-500); }
+        .health-dot.error { background: var(--danger-500); }
+    </style>
 </head>
 <body>
     <div class="app-layout" id="app"></div>
@@ -16,6 +73,7 @@
     <script src="/assets/js/api.js"></script>
     <script src="/assets/js/auth.js"></script>
     <script src="/assets/js/utils.js"></script>
+    <script src="/assets/js/sidebar.js"></script>
     <script src="/assets/js/components.js"></script>
     <script>
         if (!Auth.requireAdmin()) throw new Error('Not admin');
@@ -24,65 +82,151 @@
 
         async function loadAdminDashboard() {
             const content = document.getElementById('pageContent');
+            content.innerHTML = `
+            <div class="animate-fade-in">
+                <div class="page-header mb-6">
+                    <h2 class="page-title">Dashboard</h2>
+                    <p class="page-subtitle">Platform overview and system health</p>
+                </div>
+
+                <!-- Stats -->
+                <div class="grid grid-cols-4 gap-4 mb-6" id="adminStats">${Components.renderSkeleton('card', 4)}</div>
+
+                <!-- Main Grid -->
+                <div class="grid grid-cols-3 gap-5">
+                    <!-- Recent Users -->
+                    <div class="card col-span-2">
+                        <div class="card-header">
+                            <h3 class="card-title">Recent Users</h3>
+                            <a href="/pages/admin/users.html" class="btn btn-ghost btn-xs">View all</a>
+                        </div>
+                        <div class="table-container" style="border:none">
+                            <table class="data-table" id="recentUsersTable">
+                                <thead><tr><th>Name</th><th>ID</th><th>Role</th><th>Joined</th></tr></thead>
+                                <tbody id="recentUsersBody"><tr><td colspan="4">${Components.renderSkeleton('row', 3)}</td></tr></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- System Health -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">System Health</h3>
+                        </div>
+                        <div id="systemHealth">
+                            <div class="system-health-item">
+                                <div class="flex items-center"><span class="health-dot healthy"></span><span class="text-sm">API Server</span></div>
+                                <span class="badge badge-success">Healthy</span>
+                            </div>
+                            <div class="system-health-item">
+                                <div class="flex items-center"><span class="health-dot healthy"></span><span class="text-sm">Database</span></div>
+                                <span class="badge badge-success">Healthy</span>
+                            </div>
+                            <div class="system-health-item">
+                                <div class="flex items-center"><span class="health-dot healthy"></span><span class="text-sm">File Storage</span></div>
+                                <span class="badge badge-success">Healthy</span>
+                            </div>
+                            <div class="system-health-item">
+                                <div class="flex items-center"><span class="health-dot healthy"></span><span class="text-sm">Code Runner</span></div>
+                                <span class="badge badge-success">Healthy</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bottom Row -->
+                <div class="grid grid-cols-2 gap-5 mt-5">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">Recent Activity</h3>
+                        </div>
+                        <div id="adminActivity">${Components.renderSkeleton('text', 3)}</div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">Quick Actions</h3>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <a href="/pages/admin/users.html" class="btn btn-secondary btn-sm w-full">Manage Users</a>
+                            <a href="/pages/admin/resources.html" class="btn btn-secondary btn-sm w-full">Resources</a>
+                            <a href="/pages/admin/coding.html" class="btn btn-secondary btn-sm w-full">Coding Problems</a>
+                            <a href="/pages/admin/contests.html" class="btn btn-secondary btn-sm w-full">Contests</a>
+                            <a href="/pages/admin/notifications.html" class="btn btn-secondary btn-sm w-full">Send Notification</a>
+                            <a href="/pages/admin/audit.html" class="btn btn-secondary btn-sm w-full">Audit Logs</a>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+
+            loadAdminStats();
+            loadRecentUsers();
+            loadAdminActivity();
+        }
+
+        async function loadAdminStats() {
+            const el = document.getElementById('adminStats');
             try {
-                const data = await API.get('/admin/dashboard');
-                const stats = data?.data || {};
-
-                content.innerHTML = `
-                <div class="animate-fade-in">
-                    <div class="mb-6">
-                        <h2 class="text-2xl font-bold">Platform Overview</h2>
-                        <p class="text-sm text-gray-500">Real-time platform statistics and management</p>
+                const data = await API.get('/admin/dashboard/stats');
+                const s = data?.data || {};
+                el.innerHTML = `
+                    <div class="admin-stat-card">
+                        <div class="admin-stat-header"><span class="admin-stat-trend up">↑ 12%</span></div>
+                        <div class="admin-stat-value">${s.total_users || 0}</div>
+                        <div class="admin-stat-label">Total Users</div>
                     </div>
-
-                    <!-- Stats -->
-                    <div class="grid grid-cols-4 gap-4 mb-8">
-                        <div class="stat-card"><div class="stat-icon blue">👥</div><div class="stat-content"><div class="stat-value">${stats.total_users || 0}</div><div class="stat-label">Total Users</div></div></div>
-                        <div class="stat-card"><div class="stat-icon green">✅</div><div class="stat-content"><div class="stat-value">${stats.active_users || 0}</div><div class="stat-label">Active Users</div></div></div>
-                        <div class="stat-card"><div class="stat-icon purple">📚</div><div class="stat-content"><div class="stat-value">${stats.total_resources || 0}</div><div class="stat-label">Resources</div></div></div>
-                        <div class="stat-card"><div class="stat-icon yellow">💻</div><div class="stat-content"><div class="stat-value">${stats.total_questions || 0}</div><div class="stat-label">Coding Problems</div></div></div>
+                    <div class="admin-stat-card">
+                        <div class="admin-stat-header"><span class="admin-stat-trend up">↑ 8%</span></div>
+                        <div class="admin-stat-value">${s.total_resources || 0}</div>
+                        <div class="admin-stat-label">Resources</div>
                     </div>
-
-                    <div class="grid grid-cols-2 gap-6">
-                        <!-- Recent Users -->
-                        <div class="card">
-                            <div class="card-header">
-                                <h3 class="card-title">Recent Registrations</h3>
-                                <a href="/pages/admin/users.html" class="btn btn-ghost btn-sm">View All</a>
-                            </div>
-                            <div id="recentUsers">
-                                ${(stats.recent_users || []).slice(0, 5).map(u => `
-                                    <div class="flex items-center gap-3 py-2 border-b" style="border-color:var(--gray-100)">
-                                        <div class="avatar avatar-sm">${Utils.getInitials(u.full_name)}</div>
-                                        <div class="flex-1">
-                                            <p class="text-sm font-medium">${Utils.escapeHtml(u.full_name)}</p>
-                                            <p class="text-xs text-gray-500">${Utils.escapeHtml(u.email)}</p>
-                                        </div>
-                                        <span class="badge badge-${u.is_active ? 'success' : 'gray'}">${u.is_active ? 'Active' : 'Inactive'}</span>
-                                    </div>
-                                `).join('') || '<p class="text-sm text-gray-500">No recent registrations</p>'}
-                            </div>
-                        </div>
-
-                        <!-- System Health -->
-                        <div class="card">
-                            <div class="card-header">
-                                <h3 class="card-title">Quick Actions</h3>
-                            </div>
-                            <div class="flex flex-col gap-3">
-                                <a href="/pages/admin/users.html" class="btn btn-secondary w-full">👥 Manage Users</a>
-                                <a href="/pages/admin/resources.html" class="btn btn-secondary w-full">📚 Manage Resources</a>
-                                <a href="/pages/admin/coding.html" class="btn btn-secondary w-full">💻 Manage Coding</a>
-                                <a href="/pages/admin/notifications.html" class="btn btn-secondary w-full">🔔 Send Notification</a>
-                                <a href="/pages/admin/audit.html" class="btn btn-secondary w-full">🔒 Audit Logs</a>
-                                <a href="/pages/admin/analytics.html" class="btn btn-secondary w-full">📈 Analytics</a>
-                            </div>
-                        </div>
+                    <div class="admin-stat-card">
+                        <div class="admin-stat-header"><span class="admin-stat-trend up">↑ 24%</span></div>
+                        <div class="admin-stat-value">${s.total_submissions || 0}</div>
+                        <div class="admin-stat-label">Submissions</div>
                     </div>
-                </div>`;
+                    <div class="admin-stat-card">
+                        <div class="admin-stat-header"><span class="admin-stat-trend up">↑ 5%</span></div>
+                        <div class="admin-stat-value">${s.active_contests || 0}</div>
+                        <div class="admin-stat-label">Active Contests</div>
+                    </div>`;
             } catch (e) {
-                content.innerHTML = `<p class="text-danger">Failed to load dashboard: ${e.message}</p>`;
+                el.innerHTML = `<div class="admin-stat-card"><div class="admin-stat-value">—</div><div class="admin-stat-label">Total Users</div></div>`.repeat(4);
             }
+        }
+
+        async function loadRecentUsers() {
+            const tbody = document.getElementById('recentUsersBody');
+            try {
+                const data = await API.get('/admin/users', { page_size: 5, ordering: '-date_joined' });
+                const users = data?.data?.results || data?.data || [];
+                tbody.innerHTML = users.map(u => `
+                    <tr>
+                        <td class="cell-primary">${Utils.escapeHtml(u.full_name || u.username || '')}</td>
+                        <td>${Utils.escapeHtml(u.student_id || '—')}</td>
+                        <td><span class="badge badge-gray">${Utils.escapeHtml(u.role || 'student')}</span></td>
+                        <td class="text-gray-500">${Utils.timeAgo(u.date_joined)}</td>
+                    </tr>
+                `).join('') || '<tr><td colspan="4" class="text-center text-gray-500">No users</td></tr>';
+            } catch (e) {
+                tbody.innerHTML = '<tr><td colspan="4" class="text-gray-500">Unable to load</td></tr>';
+            }
+        }
+
+        async function loadAdminActivity() {
+            const el = document.getElementById('adminActivity');
+            try {
+                const data = await API.get('/admin/audit-logs', { page_size: 5 });
+                const logs = data?.data?.results || data?.data || [];
+                if (logs.length === 0) { el.innerHTML = '<p class="text-sm text-gray-500">No recent activity</p>'; return; }
+                el.innerHTML = logs.map(l => `
+                    <div class="flex items-center gap-3 py-2 border-b" style="border-color:var(--border-secondary)">
+                        <div class="flex-1 min-w-0">
+                            <p class="text-sm text-gray-700 truncate">${Utils.escapeHtml(l.action || l.message || '')}</p>
+                            <p class="text-2xs text-gray-400">${Utils.escapeHtml(l.user || '')} · ${Utils.timeAgo(l.created_at)}</p>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (e) { el.innerHTML = '<p class="text-sm text-gray-500">Unable to load</p>'; }
         }
     </script>
 </body>

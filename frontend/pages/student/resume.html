@@ -9,16 +9,60 @@
     <link rel="stylesheet" href="/assets/css/components.css">
     <link rel="stylesheet" href="/assets/css/utilities.css">
     <link rel="stylesheet" href="/assets/css/layout.css">
+    <link rel="stylesheet" href="/assets/css/sidebar.css">
     <style>
-        .step-indicator { display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-6); }
-        .step { width: 32px; height: 32px; border-radius: var(--radius-full); display: flex; align-items: center; justify-content: center; font-size: var(--text-sm); font-weight: var(--font-semibold); background: var(--gray-200); color: var(--gray-500); }
-        .step.active { background: var(--primary-600); color: #fff; }
-        .step.completed { background: var(--success-500); color: #fff; }
-        .step-line { flex: 1; height: 2px; background: var(--gray-200); }
-        .step-line.completed { background: var(--success-500); }
-        .resume-preview { background: #fff; border: 1px solid var(--gray-200); border-radius: var(--radius-lg); padding: var(--space-8); min-height: 600px; font-size: var(--text-sm); }
-        .template-card { border: 2px solid var(--gray-200); border-radius: var(--radius-lg); padding: var(--space-4); cursor: pointer; transition: all var(--transition-fast); text-align: center; }
-        .template-card:hover, .template-card.selected { border-color: var(--primary-500); background: var(--primary-50); }
+        .wizard-container { max-width: 720px; margin: 0 auto; }
+        .step-content { display: none; }
+        .step-content.active { display: block; animation: fadeIn 0.2s ease; }
+        .wizard-nav {
+            display: flex;
+            justify-content: space-between;
+            margin-top: var(--space-6);
+            padding-top: var(--space-4);
+            border-top: 1px solid var(--border-secondary);
+        }
+        .field-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: var(--space-3);
+        }
+        .entry-card {
+            border: 1px solid var(--border-primary);
+            border-radius: var(--radius-lg);
+            padding: var(--space-3);
+            margin-bottom: var(--space-2);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .entry-card-info h5 {
+            font-size: var(--text-sm);
+            font-weight: var(--font-medium);
+            color: var(--gray-800);
+        }
+        .entry-card-info p {
+            font-size: var(--text-xs);
+            color: var(--gray-500);
+        }
+        .skill-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: var(--space-1);
+            padding: var(--space-1) var(--space-2);
+            background: var(--primary-50);
+            color: var(--primary-700);
+            border-radius: var(--radius-full);
+            font-size: var(--text-xs);
+            font-weight: var(--font-medium);
+        }
+        .skill-tag .remove {
+            cursor: pointer;
+            opacity: 0.6;
+        }
+        .skill-tag .remove:hover { opacity: 1; }
+        @media (max-width: 768px) {
+            .field-row { grid-template-columns: 1fr; }
+        }
     </style>
 </head>
 <body>
@@ -27,240 +71,247 @@
     <script src="/assets/js/api.js"></script>
     <script src="/assets/js/auth.js"></script>
     <script src="/assets/js/utils.js"></script>
+    <script src="/assets/js/sidebar.js"></script>
     <script src="/assets/js/components.js"></script>
     <script>
         if (!Auth.requireAuth()) throw new Error('Not authenticated');
         Components.initLayout('resume', 'Resume Builder');
 
-        let currentStep = 1;
-        let resumeData = { personal: {}, education: {}, experience: [], skills: [], projects: [], template: 'modern' };
+        const steps = ['Personal', 'Education', 'Skills', 'Projects', 'Experience', 'Certifications', 'Preview'];
+        let currentStep = 0;
+        let resumeData = { personal: {}, education: [], skills: [], projects: [], experience: [], certifications: [] };
 
-        loadResumePage();
+        loadResumeBuilder();
 
-        async function loadResumePage() {
+        function loadResumeBuilder() {
             const content = document.getElementById('pageContent');
+            content.innerHTML = `
+            <div class="animate-fade-in wizard-container">
+                <div class="page-header mb-6">
+                    <h2 class="page-title">Resume Builder</h2>
+                    <p class="page-subtitle">Build a professional resume step by step</p>
+                </div>
 
-            // Check for existing resumes
-            try {
-                const data = await API.get('/resume');
-                const resumes = data?.data?.results || data?.data || [];
-                
-                content.innerHTML = `
-                <div class="animate-fade-in">
-                    <div class="flex items-center justify-between mb-6">
-                        <div>
-                            <h2 class="text-xl font-bold">Your Resumes</h2>
-                            <p class="text-sm text-gray-500">Create and manage your professional resumes</p>
+                <!-- Wizard Steps -->
+                <div class="wizard-steps" id="wizardSteps">
+                    ${steps.map((s, i) => `
+                        <div class="wizard-step ${i === 0 ? 'active' : ''}" id="step-indicator-${i}">
+                            <div class="wizard-step-number">${i + 1}</div>
+                            <span class="wizard-step-label hide-mobile">${s}</span>
                         </div>
-                        <button class="btn btn-primary" onclick="startNewResume()">+ Create New Resume</button>
+                        ${i < steps.length - 1 ? '<div class="wizard-connector"></div>' : ''}
+                    `).join('')}
+                </div>
+
+                <!-- Step Content -->
+                <div class="card">
+                    <!-- Step 1: Personal -->
+                    <div class="step-content active" id="step-0">
+                        <h3 class="text-lg font-semibold mb-4">Personal Information</h3>
+                        <div class="field-row">
+                            <div class="form-group"><label class="form-label">Full Name</label><input class="form-input" id="r-name" placeholder="John Doe"></div>
+                            <div class="form-group"><label class="form-label">Email</label><input class="form-input" id="r-email" type="email" placeholder="john@example.com"></div>
+                        </div>
+                        <div class="field-row">
+                            <div class="form-group"><label class="form-label">Phone</label><input class="form-input" id="r-phone" placeholder="+91 9876543210"></div>
+                            <div class="form-group"><label class="form-label">LinkedIn</label><input class="form-input" id="r-linkedin" placeholder="linkedin.com/in/johndoe"></div>
+                        </div>
+                        <div class="field-row">
+                            <div class="form-group"><label class="form-label">GitHub</label><input class="form-input" id="r-github" placeholder="github.com/johndoe"></div>
+                            <div class="form-group"><label class="form-label">Portfolio</label><input class="form-input" id="r-portfolio" placeholder="johndoe.dev"></div>
+                        </div>
                     </div>
 
-                    ${resumes.length > 0 ? `
-                        <div class="grid grid-cols-3 gap-4">
-                            ${resumes.map(r => `
-                                <div class="card">
-                                    <h4 class="font-semibold">${Utils.escapeHtml(r.title || 'Untitled Resume')}</h4>
-                                    <p class="text-xs text-gray-500 mt-1">Last updated: ${Utils.timeAgo(r.updated_at)}</p>
-                                    <div class="flex gap-2 mt-4">
-                                        <button class="btn btn-secondary btn-sm" onclick="editResume('${r.id}')">Edit</button>
-                                        <a href="${Config.API_BASE_URL}/resume/${r.id}/export" class="btn btn-primary btn-sm" target="_blank">📄 Export PDF</a>
-                                    </div>
-                                </div>
-                            `).join('')}
+                    <!-- Step 2: Education -->
+                    <div class="step-content" id="step-1">
+                        <h3 class="text-lg font-semibold mb-4">Education</h3>
+                        <div id="educationList"></div>
+                        <div class="field-row mt-3">
+                            <div class="form-group"><label class="form-label">Institution</label><input class="form-input" id="edu-inst" placeholder="University name"></div>
+                            <div class="form-group"><label class="form-label">Degree</label><input class="form-input" id="edu-degree" placeholder="B.Tech CSE"></div>
                         </div>
-                    ` : Components.renderEmptyState('📄', 'No resumes yet', 'Create your first professional resume', '<button class="btn btn-primary" onclick="startNewResume()">Create Resume</button>')}
-                </div>`;
-            } catch (e) {
-                content.innerHTML = `<p class="text-danger">${e.message}</p>`;
+                        <div class="field-row">
+                            <div class="form-group"><label class="form-label">Year</label><input class="form-input" id="edu-year" placeholder="2021 - 2025"></div>
+                            <div class="form-group"><label class="form-label">CGPA / %</label><input class="form-input" id="edu-cgpa" placeholder="8.5"></div>
+                        </div>
+                        <button class="btn btn-secondary btn-sm" onclick="addEducation()">+ Add Education</button>
+                    </div>
+
+                    <!-- Step 3: Skills -->
+                    <div class="step-content" id="step-2">
+                        <h3 class="text-lg font-semibold mb-4">Skills</h3>
+                        <div class="flex flex-wrap gap-2 mb-4" id="skillsList"></div>
+                        <div class="flex gap-2">
+                            <input class="form-input" id="skill-input" placeholder="Type a skill and press Enter" onkeydown="if(event.key==='Enter'){event.preventDefault();addSkill()}">
+                            <button class="btn btn-secondary btn-sm" onclick="addSkill()">Add</button>
+                        </div>
+                    </div>
+
+                    <!-- Step 4: Projects -->
+                    <div class="step-content" id="step-3">
+                        <h3 class="text-lg font-semibold mb-4">Projects</h3>
+                        <div id="projectsList"></div>
+                        <div class="form-group"><label class="form-label">Project Name</label><input class="form-input" id="proj-name" placeholder="Project title"></div>
+                        <div class="form-group"><label class="form-label">Description</label><textarea class="form-input" id="proj-desc" rows="2" placeholder="Brief description"></textarea></div>
+                        <div class="form-group"><label class="form-label">Tech Stack</label><input class="form-input" id="proj-tech" placeholder="React, Node.js, MongoDB"></div>
+                        <button class="btn btn-secondary btn-sm" onclick="addProject()">+ Add Project</button>
+                    </div>
+
+                    <!-- Step 5: Experience -->
+                    <div class="step-content" id="step-4">
+                        <h3 class="text-lg font-semibold mb-4">Experience</h3>
+                        <div id="experienceList"></div>
+                        <div class="field-row">
+                            <div class="form-group"><label class="form-label">Company</label><input class="form-input" id="exp-company" placeholder="Company name"></div>
+                            <div class="form-group"><label class="form-label">Role</label><input class="form-input" id="exp-role" placeholder="Software Intern"></div>
+                        </div>
+                        <div class="field-row">
+                            <div class="form-group"><label class="form-label">Duration</label><input class="form-input" id="exp-duration" placeholder="Jun 2024 - Aug 2024"></div>
+                            <div class="form-group"><label class="form-label">Description</label><input class="form-input" id="exp-desc" placeholder="Key responsibilities"></div>
+                        </div>
+                        <button class="btn btn-secondary btn-sm" onclick="addExperience()">+ Add Experience</button>
+                    </div>
+
+                    <!-- Step 6: Certifications -->
+                    <div class="step-content" id="step-5">
+                        <h3 class="text-lg font-semibold mb-4">Certifications</h3>
+                        <div id="certsList"></div>
+                        <div class="field-row">
+                            <div class="form-group"><label class="form-label">Certificate Name</label><input class="form-input" id="cert-name" placeholder="AWS Cloud Practitioner"></div>
+                            <div class="form-group"><label class="form-label">Issuer</label><input class="form-input" id="cert-issuer" placeholder="Amazon"></div>
+                        </div>
+                        <button class="btn btn-secondary btn-sm" onclick="addCert()">+ Add Certification</button>
+                    </div>
+
+                    <!-- Step 7: Preview -->
+                    <div class="step-content" id="step-6">
+                        <h3 class="text-lg font-semibold mb-4">Preview</h3>
+                        <div id="resumePreview" class="p-4 border rounded-xl" style="border-color:var(--border-primary);min-height:300px;background:var(--surface-secondary)"></div>
+                    </div>
+
+                    <!-- Navigation -->
+                    <div class="wizard-nav">
+                        <button class="btn btn-secondary btn-sm" id="prevBtn" onclick="prevStep()" style="visibility:hidden">← Previous</button>
+                        <button class="btn btn-primary btn-sm" id="nextBtn" onclick="nextStep()">Next →</button>
+                    </div>
+                </div>
+            </div>`;
+
+            // Pre-fill from user data
+            const user = Auth.getUser();
+            if (user) {
+                document.getElementById('r-name').value = user.full_name || '';
+                document.getElementById('r-email').value = user.email || '';
+                document.getElementById('r-phone').value = user.phone || '';
             }
         }
 
-        function startNewResume() {
-            const content = document.getElementById('pageContent');
-            currentStep = 1;
-            renderStep();
+        function nextStep() {
+            if (currentStep < steps.length - 1) {
+                document.getElementById('step-' + currentStep).classList.remove('active');
+                document.getElementById('step-indicator-' + currentStep).classList.remove('active');
+                document.getElementById('step-indicator-' + currentStep).classList.add('completed');
+                currentStep++;
+                document.getElementById('step-' + currentStep).classList.add('active');
+                document.getElementById('step-indicator-' + currentStep).classList.add('active');
+                updateNav();
+                if (currentStep === steps.length - 1) generatePreview();
+            }
         }
 
-        function renderStep() {
-            const content = document.getElementById('pageContent');
-            const steps = ['Template', 'Personal', 'Education', 'Experience', 'Skills & Projects'];
-
-            content.innerHTML = `
-            <div class="animate-fade-in">
-                <div class="step-indicator">
-                    ${steps.map((s, i) => `
-                        <div class="step ${i + 1 < currentStep ? 'completed' : ''} ${i + 1 === currentStep ? 'active' : ''}">${i + 1 < currentStep ? '✓' : i + 1}</div>
-                        ${i < steps.length - 1 ? `<div class="step-line ${i + 1 < currentStep ? 'completed' : ''}"></div>` : ''}
-                    `).join('')}
-                </div>
-                <h3 class="text-lg font-semibold mb-4">${steps[currentStep - 1]}</h3>
-                <div id="stepContent"></div>
-            </div>`;
-
-            const stepEl = document.getElementById('stepContent');
-            
-            if (currentStep === 1) renderTemplateStep(stepEl);
-            else if (currentStep === 2) renderPersonalStep(stepEl);
-            else if (currentStep === 3) renderEducationStep(stepEl);
-            else if (currentStep === 4) renderExperienceStep(stepEl);
-            else if (currentStep === 5) renderSkillsStep(stepEl);
+        function prevStep() {
+            if (currentStep > 0) {
+                document.getElementById('step-' + currentStep).classList.remove('active');
+                document.getElementById('step-indicator-' + currentStep).classList.remove('active');
+                currentStep--;
+                document.getElementById('step-' + currentStep).classList.add('active');
+                document.getElementById('step-indicator-' + currentStep).classList.add('active');
+                document.getElementById('step-indicator-' + currentStep).classList.remove('completed');
+                updateNav();
+            }
         }
 
-        function renderTemplateStep(el) {
-            el.innerHTML = `
-                <div class="grid grid-cols-3 gap-4 mb-6">
-                    <div class="template-card ${resumeData.template === 'modern' ? 'selected' : ''}" onclick="selectTemplate('modern', this)">
-                        <div style="height:120px;background:var(--gray-100);border-radius:var(--radius-md);margin-bottom:var(--space-2)"></div>
-                        <p class="font-medium">Modern</p>
-                    </div>
-                    <div class="template-card ${resumeData.template === 'classic' ? 'selected' : ''}" onclick="selectTemplate('classic', this)">
-                        <div style="height:120px;background:var(--gray-100);border-radius:var(--radius-md);margin-bottom:var(--space-2)"></div>
-                        <p class="font-medium">Classic</p>
-                    </div>
-                    <div class="template-card ${resumeData.template === 'minimal' ? 'selected' : ''}" onclick="selectTemplate('minimal', this)">
-                        <div style="height:120px;background:var(--gray-100);border-radius:var(--radius-md);margin-bottom:var(--space-2)"></div>
-                        <p class="font-medium">Minimal</p>
-                    </div>
-                </div>
-                <button class="btn btn-primary" onclick="nextStep()">Next →</button>
-            `;
+        function updateNav() {
+            document.getElementById('prevBtn').style.visibility = currentStep === 0 ? 'hidden' : 'visible';
+            document.getElementById('nextBtn').textContent = currentStep === steps.length - 2 ? 'Preview' : currentStep === steps.length - 1 ? 'Export PDF' : 'Next →';
         }
 
-        function renderPersonalStep(el) {
-            const user = Auth.getUser();
-            el.innerHTML = `
-                <div class="grid grid-cols-2 gap-4">
-                    <div class="form-group"><label class="form-label">Full Name</label><input type="text" class="form-input" id="rName" value="${Utils.escapeHtml(user?.full_name || '')}"></div>
-                    <div class="form-group"><label class="form-label">Email</label><input type="email" class="form-input" id="rEmail" value="${Utils.escapeHtml(user?.email || '')}"></div>
-                    <div class="form-group"><label class="form-label">Phone</label><input type="text" class="form-input" id="rPhone" value="${Utils.escapeHtml(user?.phone || '')}"></div>
-                    <div class="form-group"><label class="form-label">LinkedIn URL</label><input type="url" class="form-input" id="rLinkedin" placeholder="https://linkedin.com/in/..."></div>
-                    <div class="form-group"><label class="form-label">GitHub URL</label><input type="url" class="form-input" id="rGithub" placeholder="https://github.com/..."></div>
-                    <div class="form-group"><label class="form-label">Portfolio URL</label><input type="url" class="form-input" id="rPortfolio" placeholder="https://..."></div>
-                </div>
-                <div class="form-group"><label class="form-label">Summary</label><textarea class="form-input" id="rSummary" rows="3" placeholder="Brief professional summary..."></textarea></div>
-                <div class="flex gap-3">
-                    <button class="btn btn-secondary" onclick="prevStep()">← Back</button>
-                    <button class="btn btn-primary" onclick="savePersonal(); nextStep()">Next →</button>
-                </div>
-            `;
+        function addSkill() {
+            const input = document.getElementById('skill-input');
+            if (input.value.trim()) {
+                resumeData.skills.push(input.value.trim());
+                input.value = '';
+                renderSkills();
+            }
         }
 
-        function renderEducationStep(el) {
-            el.innerHTML = `
-                <div class="grid grid-cols-2 gap-4">
-                    <div class="form-group"><label class="form-label">Institution</label><input type="text" class="form-input" id="rInstitution" placeholder="University name"></div>
-                    <div class="form-group"><label class="form-label">Degree</label><input type="text" class="form-input" id="rDegree" placeholder="B.Tech CSE"></div>
-                    <div class="form-group"><label class="form-label">CGPA / Percentage</label><input type="text" class="form-input" id="rCgpa" placeholder="8.5"></div>
-                    <div class="form-group"><label class="form-label">Year</label><input type="text" class="form-input" id="rYear" placeholder="2021-2025"></div>
-                </div>
-                <div class="flex gap-3">
-                    <button class="btn btn-secondary" onclick="prevStep()">← Back</button>
-                    <button class="btn btn-primary" onclick="saveEducation(); nextStep()">Next →</button>
-                </div>
-            `;
+        function renderSkills() {
+            document.getElementById('skillsList').innerHTML = resumeData.skills.map((s, i) => `
+                <span class="skill-tag">${Utils.escapeHtml(s)} <span class="remove" onclick="resumeData.skills.splice(${i},1);renderSkills()">×</span></span>
+            `).join('');
         }
 
-        function renderExperienceStep(el) {
-            el.innerHTML = `
-                <div id="experienceList">${resumeData.experience.map((exp, i) => renderExpItem(exp, i)).join('')}</div>
-                <button class="btn btn-outline btn-sm mb-4" onclick="addExperience()">+ Add Experience</button>
-                <div class="flex gap-3">
-                    <button class="btn btn-secondary" onclick="prevStep()">← Back</button>
-                    <button class="btn btn-primary" onclick="nextStep()">Next →</button>
-                </div>
-            `;
-            if (resumeData.experience.length === 0) addExperience();
+        function addEducation() {
+            const inst = document.getElementById('edu-inst').value;
+            if (!inst) return;
+            resumeData.education.push({ institution: inst, degree: document.getElementById('edu-degree').value, year: document.getElementById('edu-year').value, cgpa: document.getElementById('edu-cgpa').value });
+            document.getElementById('edu-inst').value = '';
+            document.getElementById('edu-degree').value = '';
+            document.getElementById('edu-year').value = '';
+            document.getElementById('edu-cgpa').value = '';
+            renderEntries('educationList', resumeData.education, e => `${e.degree} - ${e.institution}`);
         }
 
-        function renderSkillsStep(el) {
-            el.innerHTML = `
-                <div class="form-group">
-                    <label class="form-label">Skills (comma separated)</label>
-                    <input type="text" class="form-input" id="rSkills" placeholder="Python, Java, React, SQL, Git..." value="${resumeData.skills.join(', ')}">
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Projects (one per line: Title | Description | Tech)</label>
-                    <textarea class="form-input" id="rProjects" rows="5" placeholder="E-commerce App | Built full-stack app | React, Node.js"></textarea>
-                </div>
-                <div class="flex gap-3">
-                    <button class="btn btn-secondary" onclick="prevStep()">← Back</button>
-                    <button class="btn btn-primary" onclick="saveResume()">Save & Generate Resume</button>
-                </div>
-            `;
-        }
-
-        function selectTemplate(template, el) {
-            document.querySelectorAll('.template-card').forEach(c => c.classList.remove('selected'));
-            el.classList.add('selected');
-            resumeData.template = template;
-        }
-
-        function nextStep() { currentStep = Math.min(5, currentStep + 1); renderStep(); }
-        function prevStep() { currentStep = Math.max(1, currentStep - 1); renderStep(); }
-
-        function savePersonal() {
-            resumeData.personal = {
-                name: document.getElementById('rName')?.value || '',
-                email: document.getElementById('rEmail')?.value || '',
-                phone: document.getElementById('rPhone')?.value || '',
-                linkedin: document.getElementById('rLinkedin')?.value || '',
-                github: document.getElementById('rGithub')?.value || '',
-                portfolio: document.getElementById('rPortfolio')?.value || '',
-                summary: document.getElementById('rSummary')?.value || '',
-            };
-        }
-
-        function saveEducation() {
-            resumeData.education = {
-                institution: document.getElementById('rInstitution')?.value || '',
-                degree: document.getElementById('rDegree')?.value || '',
-                cgpa: document.getElementById('rCgpa')?.value || '',
-                year: document.getElementById('rYear')?.value || '',
-            };
+        function addProject() {
+            const name = document.getElementById('proj-name').value;
+            if (!name) return;
+            resumeData.projects.push({ name, description: document.getElementById('proj-desc').value, tech: document.getElementById('proj-tech').value });
+            document.getElementById('proj-name').value = '';
+            document.getElementById('proj-desc').value = '';
+            document.getElementById('proj-tech').value = '';
+            renderEntries('projectsList', resumeData.projects, e => e.name);
         }
 
         function addExperience() {
-            resumeData.experience.push({ company: '', role: '', duration: '', description: '' });
-            const list = document.getElementById('experienceList');
-            list.innerHTML = resumeData.experience.map((exp, i) => renderExpItem(exp, i)).join('');
+            const company = document.getElementById('exp-company').value;
+            if (!company) return;
+            resumeData.experience.push({ company, role: document.getElementById('exp-role').value, duration: document.getElementById('exp-duration').value, description: document.getElementById('exp-desc').value });
+            document.getElementById('exp-company').value = '';
+            document.getElementById('exp-role').value = '';
+            document.getElementById('exp-duration').value = '';
+            document.getElementById('exp-desc').value = '';
+            renderEntries('experienceList', resumeData.experience, e => `${e.role} at ${e.company}`);
         }
 
-        function renderExpItem(exp, i) {
-            return `
-            <div class="card mb-3 p-4">
-                <div class="grid grid-cols-2 gap-3">
-                    <input type="text" class="form-input" placeholder="Company" value="${Utils.escapeHtml(exp.company)}" onchange="resumeData.experience[${i}].company=this.value">
-                    <input type="text" class="form-input" placeholder="Role" value="${Utils.escapeHtml(exp.role)}" onchange="resumeData.experience[${i}].role=this.value">
-                    <input type="text" class="form-input" placeholder="Duration" value="${Utils.escapeHtml(exp.duration)}" onchange="resumeData.experience[${i}].duration=this.value">
-                </div>
-                <textarea class="form-input mt-2" rows="2" placeholder="Description" onchange="resumeData.experience[${i}].description=this.value">${Utils.escapeHtml(exp.description)}</textarea>
-            </div>`;
+        function addCert() {
+            const name = document.getElementById('cert-name').value;
+            if (!name) return;
+            resumeData.certifications.push({ name, issuer: document.getElementById('cert-issuer').value });
+            document.getElementById('cert-name').value = '';
+            document.getElementById('cert-issuer').value = '';
+            renderEntries('certsList', resumeData.certifications, e => `${e.name} - ${e.issuer}`);
         }
 
-        async function saveResume() {
-            resumeData.skills = (document.getElementById('rSkills')?.value || '').split(',').map(s => s.trim()).filter(Boolean);
-            const projectsText = document.getElementById('rProjects')?.value || '';
-            resumeData.projects = projectsText.split('\n').filter(Boolean).map(line => {
-                const [title, desc, tech] = line.split('|').map(s => s.trim());
-                return { title, description: desc, technologies: tech };
-            });
-
-            try {
-                await API.post('/resume', { data: resumeData, template: resumeData.template, title: resumeData.personal.name + ' Resume' });
-                Toast.success('Resume saved successfully!');
-                loadResumePage();
-            } catch (e) {
-                Toast.error(e.message || 'Failed to save resume');
-            }
+        function renderEntries(containerId, arr, labelFn) {
+            document.getElementById(containerId).innerHTML = arr.map((e, i) => `
+                <div class="entry-card"><div class="entry-card-info"><h5>${Utils.escapeHtml(labelFn(e))}</h5></div><button class="btn-icon btn-icon-sm" onclick="this.closest('.entry-card').remove()">×</button></div>
+            `).join('');
         }
 
-        async function editResume(id) {
-            try {
-                const data = await API.get(`/resume/${id}`);
-                resumeData = data?.data?.data || resumeData;
-                currentStep = 1;
-                renderStep();
-            } catch (e) { Toast.error(e.message); }
+        function generatePreview() {
+            const p = resumeData;
+            const name = document.getElementById('r-name').value || 'Your Name';
+            const email = document.getElementById('r-email').value;
+            document.getElementById('resumePreview').innerHTML = `
+                <div style="font-family:var(--font-sans);color:var(--gray-800)">
+                    <h2 style="font-size:var(--text-xl);font-weight:700;margin-bottom:4px">${Utils.escapeHtml(name)}</h2>
+                    <p style="font-size:var(--text-xs);color:var(--gray-500)">${Utils.escapeHtml(email)} ${document.getElementById('r-phone').value ? '· ' + document.getElementById('r-phone').value : ''}</p>
+                    ${p.education.length ? `<h4 style="margin-top:16px;font-size:var(--text-sm);font-weight:600;border-bottom:1px solid var(--border-primary);padding-bottom:4px">Education</h4>${p.education.map(e => `<p style="font-size:var(--text-xs);margin-top:6px"><strong>${Utils.escapeHtml(e.degree)}</strong> — ${Utils.escapeHtml(e.institution)} (${Utils.escapeHtml(e.year)}) ${e.cgpa ? '| ' + e.cgpa : ''}</p>`).join('')}` : ''}
+                    ${p.skills.length ? `<h4 style="margin-top:16px;font-size:var(--text-sm);font-weight:600;border-bottom:1px solid var(--border-primary);padding-bottom:4px">Skills</h4><p style="font-size:var(--text-xs);margin-top:6px">${p.skills.join(', ')}</p>` : ''}
+                    ${p.projects.length ? `<h4 style="margin-top:16px;font-size:var(--text-sm);font-weight:600;border-bottom:1px solid var(--border-primary);padding-bottom:4px">Projects</h4>${p.projects.map(e => `<p style="font-size:var(--text-xs);margin-top:6px"><strong>${Utils.escapeHtml(e.name)}</strong> — ${Utils.escapeHtml(e.description)} <em>(${Utils.escapeHtml(e.tech)})</em></p>`).join('')}` : ''}
+                    ${p.experience.length ? `<h4 style="margin-top:16px;font-size:var(--text-sm);font-weight:600;border-bottom:1px solid var(--border-primary);padding-bottom:4px">Experience</h4>${p.experience.map(e => `<p style="font-size:var(--text-xs);margin-top:6px"><strong>${Utils.escapeHtml(e.role)}</strong> at ${Utils.escapeHtml(e.company)} (${Utils.escapeHtml(e.duration)})</p>`).join('')}` : ''}
+                    ${p.certifications.length ? `<h4 style="margin-top:16px;font-size:var(--text-sm);font-weight:600;border-bottom:1px solid var(--border-primary);padding-bottom:4px">Certifications</h4>${p.certifications.map(e => `<p style="font-size:var(--text-xs);margin-top:6px">${Utils.escapeHtml(e.name)} — ${Utils.escapeHtml(e.issuer)}</p>`).join('')}` : ''}
+                </div>`;
         }
     </script>
 </body>

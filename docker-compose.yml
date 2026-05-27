@@ -110,8 +110,13 @@ services:
       dockerfile: Dockerfile
     container_name: campushub_executor
     restart: unless-stopped
+    environment:
+      - EXECUTOR_WORK_DIR=/tmp/executor
+      - EXECUTOR_MEMORY_MB=192
+      - EXECUTOR_TIMEOUT_SEC=10
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+      - executor_work:/tmp/executor
     ports:
       - "8001:8001"
     networks:
@@ -122,6 +127,8 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        VITE_API_URL: /api
     container_name: campushub_frontend
     restart: unless-stopped
     networks:
@@ -148,6 +155,7 @@ volumes:
   postgres_data:
   static_files:
   media_files:
+  executor_work:
 
 networks:
   campushub_net:

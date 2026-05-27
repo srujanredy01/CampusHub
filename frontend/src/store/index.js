@@ -5,6 +5,7 @@ import resourceReducer from "./slices/resourceSlice";
 import newsReducer from "./slices/newsSlice";
 import codingReducer from "./slices/codingSlice";
 import notificationReducer from "./slices/notificationSlice";
+import savedReducer from "./slices/savedSlice";
 
 export const store = configureStore({
   reducer: {
@@ -14,6 +15,7 @@ export const store = configureStore({
     news: newsReducer,
     coding: codingReducer,
     notifications: notificationReducer,
+    saved: savedReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

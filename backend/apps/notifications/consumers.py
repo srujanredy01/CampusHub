@@ -152,7 +152,7 @@ class AdminNotificationConsumer(AsyncWebsocketConsumer):
             await self.close(code=4001)
             return
 
-        if self.user.role != "admin":
+        if self.user.role not in ("admin", "super_admin"):
             await self.close(code=4003)
             return
 

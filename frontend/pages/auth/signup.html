@@ -12,93 +12,45 @@
 </head>
 <body>
     <div class="auth-layout">
-        <div class="auth-card animate-fade-in" style="max-width:520px">
+        <div class="auth-card">
             <div class="auth-header">
-                <div class="auth-logo">🎓</div>
-                <h1 class="auth-title">Create Account</h1>
-                <p class="auth-subtitle">Join CampusHub and access all campus resources</p>
+                <div class="auth-logo">C</div>
+                <h1 class="auth-title">Create account</h1>
+                <p class="auth-subtitle">Join CampusHub to access all features</p>
             </div>
 
             <form id="signupForm" onsubmit="handleSignup(event)">
-                <div class="grid grid-cols-2 gap-4">
-                    <div class="form-group">
-                        <label class="form-label" for="fullName">Full Name *</label>
-                        <input type="text" id="fullName" class="form-input" placeholder="John Doe" required>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label" for="studentId">Student ID *</label>
-                        <input type="text" id="studentId" class="form-input" placeholder="12345678" required>
-                    </div>
+                <div class="form-group">
+                    <label class="form-label" for="fullName">Full Name</label>
+                    <input class="form-input" id="fullName" type="text" placeholder="Enter your full name" required>
                 </div>
 
                 <div class="form-group">
-                    <label class="form-label" for="email">Email *</label>
-                    <input type="email" id="email" class="form-input" placeholder="you@gmail.com" required>
-                    <span class="form-hint">Accepted: @gmail.com, @lpu.in, @outlook.com</span>
+                    <label class="form-label" for="studentId">Student ID</label>
+                    <input class="form-input" id="studentId" type="text" placeholder="e.g. 21BCE1234" required>
                 </div>
 
-                <div class="grid grid-cols-2 gap-4">
-                    <div class="form-group">
-                        <label class="form-label" for="phone">Phone</label>
-                        <input type="tel" id="phone" class="form-input" placeholder="+91 9876543210">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label" for="branch">Branch *</label>
-                        <select id="branch" class="form-input" required>
-                            <option value="">Select Branch</option>
-                            <option value="CSE">CSE</option>
-                            <option value="ECE">ECE</option>
-                            <option value="ME">ME</option>
-                            <option value="CE">CE</option>
-                            <option value="EE">EE</option>
-                            <option value="IT">IT</option>
-                            <option value="AI/ML">AI/ML</option>
-                            <option value="Data Science">Data Science</option>
-                        </select>
-                    </div>
+                <div class="form-group">
+                    <label class="form-label" for="email">Email</label>
+                    <input class="form-input" id="email" type="email" placeholder="your.email@university.edu" required>
                 </div>
 
-                <div class="grid grid-cols-3 gap-4">
-                    <div class="form-group">
-                        <label class="form-label" for="semester">Semester</label>
-                        <select id="semester" class="form-input">
-                            <option value="1">1</option>
-                            <option value="2">2</option>
-                            <option value="3">3</option>
-                            <option value="4">4</option>
-                            <option value="5">5</option>
-                            <option value="6">6</option>
-                            <option value="7">7</option>
-                            <option value="8">8</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label" for="section">Section</label>
-                        <input type="text" id="section" class="form-input" placeholder="A">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label" for="batch">Batch</label>
-                        <input type="text" id="batch" class="form-input" placeholder="2024">
-                    </div>
+                <div class="form-group">
+                    <label class="form-label" for="password">Password</label>
+                    <input class="form-input" id="password" type="password" placeholder="Create a strong password" required minlength="8">
+                    <p class="form-hint">Minimum 8 characters</p>
                 </div>
 
-                <div class="grid grid-cols-2 gap-4">
-                    <div class="form-group">
-                        <label class="form-label" for="password">Password *</label>
-                        <input type="password" id="password" class="form-input" placeholder="Min 8 characters" required>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label" for="passwordConfirm">Confirm Password *</label>
-                        <input type="password" id="passwordConfirm" class="form-input" placeholder="Repeat password" required>
-                    </div>
+                <div class="form-group">
+                    <label class="form-label" for="confirmPassword">Confirm Password</label>
+                    <input class="form-input" id="confirmPassword" type="password" placeholder="Confirm your password" required>
                 </div>
 
-                <button type="submit" class="btn btn-primary w-full btn-lg mt-4" id="signupBtn">
-                    Create Account
-                </button>
+                <button type="submit" class="btn btn-primary w-full mt-2" id="signupBtn">Create Account</button>
 
-                <div id="signupError" class="form-error text-center mt-4" style="display:none"></div>
-                <div id="signupSuccess" class="text-center mt-4 text-success text-sm" style="display:none"></div>
+                <div id="signupError" class="mt-3" style="display:none">
+                    <div class="alert alert-danger"><span id="signupErrorMsg"></span></div>
+                </div>
             </form>
 
             <div class="auth-footer">
@@ -112,57 +64,45 @@
     <script src="/assets/js/auth.js"></script>
     <script src="/assets/js/utils.js"></script>
     <script>
-        Auth.redirectIfAuth();
+        if (Auth.redirectIfAuth()) throw new Error('Already authenticated');
 
         async function handleSignup(e) {
             e.preventDefault();
             const btn = document.getElementById('signupBtn');
             const errorEl = document.getElementById('signupError');
-            const successEl = document.getElementById('signupSuccess');
 
-            const formData = {
-                full_name: document.getElementById('fullName').value.trim(),
-                student_id: document.getElementById('studentId').value.trim(),
-                email: document.getElementById('email').value.trim(),
-                phone: document.getElementById('phone').value.trim(),
-                branch: document.getElementById('branch').value,
-                semester: parseInt(document.getElementById('semester').value),
-                section: document.getElementById('section').value.trim(),
-                batch: document.getElementById('batch').value.trim(),
-                password: document.getElementById('password').value,
-                password_confirm: document.getElementById('passwordConfirm').value,
-            };
+            const password = document.getElementById('password').value;
+            const confirm = document.getElementById('confirmPassword').value;
 
-            if (formData.password !== formData.password_confirm) {
-                errorEl.textContent = 'Passwords do not match.';
+            if (password !== confirm) {
+                document.getElementById('signupErrorMsg').textContent = 'Passwords do not match';
                 errorEl.style.display = 'block';
                 return;
             }
 
             btn.disabled = true;
-            btn.textContent = 'Creating account...';
+            btn.innerHTML = '<div class="spinner spinner-sm"></div> Creating account...';
             errorEl.style.display = 'none';
-            successEl.style.display = 'none';
 
             try {
-                const data = await Auth.signup(formData);
-                if (data.success) {
-                    successEl.textContent = data.message || 'Account created! Check your email to verify.';
-                    successEl.style.display = 'block';
-                    document.getElementById('signupForm').reset();
-                }
-            } catch (error) {
-                const errors = error.data?.errors;
-                if (errors) {
-                    const messages = Object.values(errors).flat().join(' ');
-                    errorEl.textContent = messages;
+                const result = await Auth.signup({
+                    full_name: document.getElementById('fullName').value.trim(),
+                    student_id: document.getElementById('studentId').value.trim(),
+                    email: document.getElementById('email').value.trim(),
+                    password: password,
+                    password_confirm: confirm,
+                });
+
+                if (result.success) {
+                    window.location.href = '/pages/auth/login.html?registered=true';
                 } else {
-                    errorEl.textContent = error.message || 'Signup failed. Please try again.';
+                    throw new Error(result.message || 'Registration failed');
                 }
+            } catch (err) {
+                document.getElementById('signupErrorMsg').textContent = err.message || 'Registration failed';
                 errorEl.style.display = 'block';
-            } finally {
                 btn.disabled = false;
-                btn.textContent = 'Create Account';
+                btn.innerHTML = 'Create Account';
             }
         }
     </script>

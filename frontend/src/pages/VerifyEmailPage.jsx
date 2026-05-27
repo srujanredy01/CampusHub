@@ -1,40 +1,27 @@
-import React, { useEffect, useState } from "react";
-import { useSearchParams, Link } from "react-router-dom";
-import api from "../services/api";
+import { Link, useLocation } from "react-router-dom";
 
 export default function VerifyEmailPage() {
-  const [params] = useSearchParams();
-  const [status, setStatus] = useState("verifying"); // verifying | success | error
-  const [message, setMessage] = useState("");
-
-  useEffect(() => {
-    const token = params.get("token");
-    if (!token) { setStatus("error"); setMessage("No token provided."); return; }
-    api.get(`/auth/verify-email?token=${token}`)
-      .then((r) => { setStatus("success"); setMessage(r.data.message); })
-      .catch((e) => { setStatus("error"); setMessage(e.response?.data?.error?.message || "Verification failed."); });
-  }, [params]);
+  const location = useLocation();
+  const email = location.state?.email || "your email";
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50 to-blue-100 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-8 text-center">
-        {status === "verifying" && <><div className="text-4xl mb-4">⏳</div><p className="text-gray-600">Verifying your email…</p></>}
-        {status === "success" && (
-          <>
-            <div className="text-5xl mb-4">✅</div>
-            <h1 className="text-xl font-bold text-gray-900 mb-2">Email Verified!</h1>
-            <p className="text-gray-500 mb-6">{message}</p>
-            <Link to="/login" className="btn-primary inline-block">Go to Login</Link>
-          </>
-        )}
-        {status === "error" && (
-          <>
-            <div className="text-5xl mb-4">❌</div>
-            <h1 className="text-xl font-bold text-gray-900 mb-2">Verification Failed</h1>
-            <p className="text-gray-500 mb-6">{message}</p>
-            <Link to="/login" className="btn-secondary inline-block">Back to Login</Link>
-          </>
-        )}
+    <div className="min-h-screen flex items-center justify-center p-6 bg-surface-50">
+      <div className="w-full max-w-sm text-center">
+        <div className="w-14 h-14 rounded-2xl bg-primary-50 flex items-center justify-center mx-auto mb-6">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="1.75">
+            <rect x="2" y="4" width="20" height="16" rx="2"/><polyline points="22,7 12,13 2,7"/>
+          </svg>
+        </div>
+        <h1 className="text-2xl font-display font-bold text-surface-900">Check your email</h1>
+        <p className="mt-2 text-sm text-surface-500 leading-relaxed">
+          We've sent a verification link to <strong className="text-surface-700">{email}</strong>. Click the link to activate your account.
+        </p>
+        <div className="mt-8 space-y-3">
+          <Link to="/login" className="btn-primary w-full justify-center">Go to login</Link>
+          <p className="text-xs text-surface-400">
+            Didn't receive it? Check your spam folder or try signing up again.
+          </p>
+        </div>
       </div>
     </div>
   );

@@ -1,435 +1,475 @@
-import React, { useState, useEffect } from "react";
-import { placementService } from "../services/placementService";
+import { useState, useEffect, useCallback } from "react";
+import api from "../services/api";
 import { toast } from "react-toastify";
 
-const STATUS_OPTIONS = [
-  { value: "wishlist", label: "Wishlist", color: "bg-gray-100 text-gray-700" },
-  { value: "applied", label: "Applied", color: "bg-blue-100 text-blue-700" },
-  { value: "oa_scheduled", label: "OA Scheduled", color: "bg-indigo-100 text-indigo-700" },
-  { value: "oa_completed", label: "OA Completed", color: "bg-purple-100 text-purple-700" },
-  { value: "shortlisted", label: "Shortlisted", color: "bg-cyan-100 text-cyan-700" },
-  { value: "interview_round_1", label: "Interview Round 1", color: "bg-amber-100 text-amber-700" },
-  { value: "interview_round_2", label: "Interview Round 2", color: "bg-orange-100 text-orange-700" },
-  { value: "hr_round", label: "HR Round", color: "bg-pink-100 text-pink-700" },
-  { value: "selected", label: "Selected", color: "bg-emerald-100 text-emerald-700" },
-  { value: "rejected", label: "Rejected", color: "bg-red-100 text-red-700" },
-  { value: "offer_received", label: "Offer Received", color: "bg-green-100 text-green-700" },
-  { value: "joined", label: "Joined", color: "bg-teal-100 text-teal-700" },
+// ── Pipeline Stage Config ────────────────────────────────────────────────────
+const STAGES = [
+  { id: "wishlist", label: "Wishlist", color: "bg-slate-100 text-slate-700", icon: "⭐" },
+  { id: "applied", label: "Applied", color: "bg-blue-100 text-blue-700", icon: "📤" },
+  { id: "oa_scheduled", label: "OA Scheduled", color: "bg-indigo-100 text-indigo-700", icon: "📝" },
+  { id: "oa_completed", label: "OA Done", color: "bg-violet-100 text-violet-700", icon: "✅" },
+  { id: "shortlisted", label: "Shortlisted", color: "bg-purple-100 text-purple-700", icon: "🎯" },
+  { id: "interview_round_1", label: "Interview 1", color: "bg-amber-100 text-amber-700", icon: "🗣️" },
+  { id: "interview_round_2", label: "Interview 2", color: "bg-orange-100 text-orange-700", icon: "🗣️" },
+  { id: "hr_round", label: "HR Round", color: "bg-pink-100 text-pink-700", icon: "🤝" },
+  { id: "selected", label: "Selected", color: "bg-emerald-100 text-emerald-700", icon: "🎉" },
+  { id: "offer_received", label: "Offer", color: "bg-green-100 text-green-700", icon: "💰" },
+  { id: "rejected", label: "Rejected", color: "bg-red-100 text-red-700", icon: "❌" },
 ];
 
-const JOB_TYPES = [
-  { value: "full_time", label: "Full Time" },
-  { value: "internship", label: "Internship" },
-  { value: "contract", label: "Contract" },
-];
+const STAGE_MAP = Object.fromEntries(STAGES.map((s) => [s.id, s]));
 
-function PlacementPage() {
-  const [applications, setApplications] = useState([]);
-  const [stats, setStats] = useState(null);
-  const [readiness, setReadiness] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [editingApp, setEditingApp] = useState(null);
-  const [activeTab, setActiveTab] = useState("list");
-  const [filterStatus, setFilterStatus] = useState("");
-  const [formData, setFormData] = useState({
+// ── Application Card ─────────────────────────────────────────────────────────
+function AppCard({ app, onStatusChange, onDelete, onClick }) {
+  const stage = STAGE_MAP[app.status] || STAGES[0];
+  const daysUntilDeadline = app.deadline
+    ? Math.ceil((new Date(app.deadline) - new Date()) / (1000 * 60 * 60 * 24))
+    : null;
+
+  return (
+    <div
+      onClick={() => onClick(app)}
+      className="p-3.5 rounded-xl border border-surface-100 bg-white hover:shadow-card-hover hover:border-primary-200 transition-all duration-150 cursor-pointer group"
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <h4 className="text-sm font-semibold text-surface-800 truncate group-hover:text-primary-700 transition-colors">
+            {app.company_name}
+          </h4>
+          <p className="text-xs text-surface-500 mt-0.5 truncate">{app.role}</p>
+        </div>
+        {app.package_lpa && (
+          <span className="text-xs font-medium text-success-600 bg-success-50 px-2 py-0.5 rounded-full flex-shrink-0">
+            ₹{app.package_lpa}L
+          </span>
+        )}
+      </div>
+
+      <div className="flex items-center gap-2 mt-2.5 flex-wrap">
+        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-2xs font-medium ${stage.color}`}>
+          {stage.icon} {stage.label}
+        </span>
+        {app.job_type && app.job_type !== "full_time" && (
+          <span className="text-2xs text-surface-400 bg-surface-100 px-1.5 py-0.5 rounded">
+            {app.job_type === "internship" ? "Intern" : "Contract"}
+          </span>
+        )}
+      </div>
+
+      {daysUntilDeadline !== null && daysUntilDeadline >= 0 && daysUntilDeadline <= 7 && (
+        <div className="mt-2 flex items-center gap-1.5 text-xs text-warning-600">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          {daysUntilDeadline === 0 ? "Due today" : `${daysUntilDeadline}d left`}
+        </div>
+      )}
+
+      {app.location && (
+        <p className="text-2xs text-surface-400 mt-1.5 truncate">📍 {app.location}</p>
+      )}
+    </div>
+  );
+}
+
+// ── Add Application Modal ────────────────────────────────────────────────────
+function AddAppModal({ isOpen, onClose, onAdd, editApp }) {
+  const [form, setForm] = useState({
     company_name: "", role: "", package_lpa: "", status: "wishlist",
     application_date: "", deadline: "", job_link: "", location: "",
     job_type: "full_time", notes: "",
   });
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    loadData();
-  }, [filterStatus]);
-
-  const loadData = async () => {
-    setLoading(true);
-    try {
-      const params = filterStatus ? { status: filterStatus } : {};
-      const [appsRes, statsRes, readinessRes] = await Promise.all([
-        placementService.getApplications(params),
-        placementService.getStats(),
-        placementService.getReadiness(),
-      ]);
-      setApplications(appsRes.data.results || appsRes.data.data || []);
-      setStats(statsRes.data.data);
-      setReadiness(readinessRes.data.data);
-    } catch (error) {
-      toast.error("Failed to load placement data");
-    } finally {
-      setLoading(false);
+    if (editApp) {
+      setForm({
+        company_name: editApp.company_name || "",
+        role: editApp.role || "",
+        package_lpa: editApp.package_lpa || "",
+        status: editApp.status || "wishlist",
+        application_date: editApp.application_date || "",
+        deadline: editApp.deadline || "",
+        job_link: editApp.job_link || "",
+        location: editApp.location || "",
+        job_type: editApp.job_type || "full_time",
+        notes: editApp.notes || "",
+      });
+    } else {
+      setForm({
+        company_name: "", role: "", package_lpa: "", status: "wishlist",
+        application_date: "", deadline: "", job_link: "", location: "",
+        job_type: "full_time", notes: "",
+      });
     }
-  };
+  }, [editApp, isOpen]);
+
+  if (!isOpen) return null;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const payload = { ...formData };
-    if (!payload.package_lpa) delete payload.package_lpa;
-    else payload.package_lpa = parseFloat(payload.package_lpa);
-    if (!payload.application_date) delete payload.application_date;
-    if (!payload.deadline) delete payload.deadline;
-
-    try {
-      if (editingApp) {
-        await placementService.updateApplication(editingApp.id, payload);
-        toast.success("Application updated");
-      } else {
-        await placementService.createApplication(payload);
-        toast.success("Application added");
-      }
-      setShowForm(false);
-      setEditingApp(null);
-      resetForm();
-      loadData();
-    } catch (error) {
-      toast.error(error.response?.data?.error?.message || "Failed to save");
+    if (!form.company_name || !form.role) {
+      toast.error("Company name and role are required");
+      return;
     }
+    setSubmitting(true);
+    try {
+      const payload = { ...form };
+      if (!payload.package_lpa) delete payload.package_lpa;
+      if (!payload.application_date) delete payload.application_date;
+      if (!payload.deadline) delete payload.deadline;
+      await onAdd(payload, editApp?.id);
+      onClose();
+    } catch (err) {
+      toast.error(err?.response?.data?.error?.message || "Failed to save");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-surface-900/30 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white rounded-2xl shadow-float w-full max-w-lg p-6 animate-fade-up max-h-[90vh] overflow-y-auto">
+        <h3 className="text-lg font-semibold text-surface-900 mb-4">
+          {editApp ? "Edit Application" : "Add Application"}
+        </h3>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="col-span-2 sm:col-span-1">
+              <label className="text-xs font-medium text-surface-600 mb-1 block">Company *</label>
+              <input type="text" value={form.company_name} onChange={(e) => setForm({ ...form, company_name: e.target.value })}
+                className="input-field" placeholder="e.g., Google" />
+            </div>
+            <div className="col-span-2 sm:col-span-1">
+              <label className="text-xs font-medium text-surface-600 mb-1 block">Role *</label>
+              <input type="text" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}
+                className="input-field" placeholder="e.g., SDE Intern" />
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="text-xs font-medium text-surface-600 mb-1 block">Package (LPA)</label>
+              <input type="number" step="0.01" value={form.package_lpa} onChange={(e) => setForm({ ...form, package_lpa: e.target.value })}
+                className="input-field" placeholder="12.5" />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-surface-600 mb-1 block">Type</label>
+              <select value={form.job_type} onChange={(e) => setForm({ ...form, job_type: e.target.value })} className="input-field">
+                <option value="full_time">Full Time</option>
+                <option value="internship">Internship</option>
+                <option value="contract">Contract</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-surface-600 mb-1 block">Status</label>
+              <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} className="input-field">
+                {STAGES.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+              </select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-medium text-surface-600 mb-1 block">Applied Date</label>
+              <input type="date" value={form.application_date} onChange={(e) => setForm({ ...form, application_date: e.target.value })}
+                className="input-field" />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-surface-600 mb-1 block">Deadline</label>
+              <input type="date" value={form.deadline} onChange={(e) => setForm({ ...form, deadline: e.target.value })}
+                className="input-field" />
+            </div>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-surface-600 mb-1 block">Location</label>
+            <input type="text" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })}
+              className="input-field" placeholder="Bangalore, Remote, etc." />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-surface-600 mb-1 block">Job Link</label>
+            <input type="url" value={form.job_link} onChange={(e) => setForm({ ...form, job_link: e.target.value })}
+              className="input-field" placeholder="https://..." />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-surface-600 mb-1 block">Notes</label>
+            <textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })}
+              className="input-field min-h-[60px] resize-none" placeholder="Prep notes, contacts, etc." />
+          </div>
+          <div className="flex items-center gap-3 pt-2">
+            <button type="button" onClick={onClose} className="flex-1 px-4 py-2.5 text-sm font-medium text-surface-600 bg-surface-100 hover:bg-surface-200 rounded-lg transition-colors">
+              Cancel
+            </button>
+            <button type="submit" disabled={submitting} className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors disabled:opacity-50">
+              {submitting ? "Saving..." : editApp ? "Update" : "Add Application"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ── Main Page ────────────────────────────────────────────────────────────────
+export default function PlacementPage() {
+  const [applications, setApplications] = useState([]);
+  const [stats, setStats] = useState(null);
+  const [readiness, setReadiness] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [view, setView] = useState("pipeline"); // pipeline | list
+  const [showModal, setShowModal] = useState(false);
+  const [editApp, setEditApp] = useState(null);
+  const [statusFilter, setStatusFilter] = useState("");
+
+  const fetchData = useCallback(async () => {
+    try {
+      const [appsRes, statsRes, readinessRes] = await Promise.allSettled([
+        api.get("/placement/applications"),
+        api.get("/placement/stats"),
+        api.get("/placement/readiness"),
+      ]);
+
+      if (appsRes.status === "fulfilled") {
+        const data = appsRes.value.data;
+        setApplications(data?.results || data?.data || []);
+      }
+      if (statsRes.status === "fulfilled") {
+        setStats(statsRes.value.data?.data || null);
+      }
+      if (readinessRes.status === "fulfilled") {
+        setReadiness(readinessRes.value.data?.data || null);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  const handleAdd = async (payload, editId) => {
+    if (editId) {
+      await api.put(`/placement/applications/${editId}`, payload);
+      toast.success("Application updated");
+    } else {
+      await api.post("/placement/applications/create", payload);
+      toast.success("Application added");
+    }
+    fetchData();
   };
 
   const handleDelete = async (id) => {
     if (!window.confirm("Delete this application?")) return;
     try {
-      await placementService.deleteApplication(id);
-      toast.success("Application deleted");
-      loadData();
-    } catch {
-      toast.error("Failed to delete");
-    }
-  };
-
-  const handleEdit = (app) => {
-    setEditingApp(app);
-    setFormData({
-      company_name: app.company_name, role: app.role,
-      package_lpa: app.package_lpa || "", status: app.status,
-      application_date: app.application_date || "", deadline: app.deadline || "",
-      job_link: app.job_link || "", location: app.location || "",
-      job_type: app.job_type || "full_time", notes: app.notes || "",
-    });
-    setShowForm(true);
+      await api.delete(`/placement/applications/${id}`);
+      toast.success("Deleted");
+      fetchData();
+    } catch { toast.error("Failed to delete"); }
   };
 
   const handleStatusChange = async (id, newStatus) => {
     try {
-      await placementService.updateApplication(id, { status: newStatus });
-      toast.success("Status updated");
-      loadData();
-    } catch {
-      toast.error("Failed to update status");
-    }
+      await api.put(`/placement/applications/${id}`, { status: newStatus });
+      fetchData();
+    } catch { toast.error("Failed to update status"); }
   };
 
-  const resetForm = () => {
-    setFormData({
-      company_name: "", role: "", package_lpa: "", status: "wishlist",
-      application_date: "", deadline: "", job_link: "", location: "",
-      job_type: "full_time", notes: "",
-    });
+  const handleCardClick = (app) => {
+    setEditApp(app);
+    setShowModal(true);
   };
 
-  const getStatusBadge = (statusVal) => {
-    const opt = STATUS_OPTIONS.find((s) => s.value === statusVal);
-    return opt ? (
-      <span className={`px-2 py-1 rounded-full text-xs font-medium ${opt.color}`}>
-        {opt.label}
-      </span>
-    ) : null;
-  };
+  // Group by status for pipeline view
+  const grouped = {};
+  STAGES.forEach((s) => { grouped[s.id] = []; });
+  applications.forEach((app) => {
+    if (grouped[app.status]) grouped[app.status].push(app);
+    else grouped.wishlist.push(app);
+  });
+
+  const filteredApps = statusFilter
+    ? applications.filter((a) => a.status === statusFilter)
+    : applications;
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" />
+      <div className="page-container space-y-6">
+        <div className="skeleton h-12 w-64 rounded-lg" />
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => <div key={i} className="skeleton h-24 rounded-xl" />)}
+        </div>
+        <div className="skeleton h-96 rounded-xl" />
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="page-container space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Placement Tracker</h1>
-          <p className="text-gray-500 mt-1">Track your placement journey</p>
+          <h1 className="page-title">Placement Tracker</h1>
+          <p className="page-subtitle">Manage your placement journey end-to-end</p>
         </div>
         <button
-          onClick={() => { setShowForm(true); setEditingApp(null); resetForm(); }}
-          className="px-4 py-2 bg-primary-600 text-white rounded-xl hover:bg-primary-700 transition font-medium"
+          onClick={() => { setEditApp(null); setShowModal(true); }}
+          className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors shadow-sm"
         >
-          + Add Application
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Add Application
         </button>
       </div>
 
-      {/* Stats Cards */}
-      {stats && (
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          <StatCard label="Total" value={stats.total_applications} color="blue" />
-          <StatCard label="Interviews" value={stats.interviews_count} color="amber" />
-          <StatCard label="Offers" value={stats.offers} color="green" />
-          <StatCard label="Rejected" value={stats.rejections} color="red" />
-          <StatCard label="Wishlist" value={stats.wishlist} color="gray" />
+      {/* Stats Row */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className="card-padded text-center">
+          <p className="text-2xl font-bold text-surface-900 tabular-nums">{stats?.total_applications || 0}</p>
+          <p className="text-xs text-surface-500 mt-0.5">Total Applications</p>
         </div>
-      )}
+        <div className="card-padded text-center">
+          <p className="text-2xl font-bold text-success-600 tabular-nums">{stats?.offers || 0}</p>
+          <p className="text-xs text-surface-500 mt-0.5">Offers</p>
+        </div>
+        <div className="card-padded text-center">
+          <p className="text-2xl font-bold text-info-600 tabular-nums">{stats?.interviews_count || 0}</p>
+          <p className="text-xs text-surface-500 mt-0.5">Interviews</p>
+        </div>
+        <div className="card-padded text-center">
+          <p className="text-2xl font-bold text-primary-600 tabular-nums">{readiness?.overall_score || 0}%</p>
+          <p className="text-xs text-surface-500 mt-0.5">Readiness</p>
+        </div>
+      </div>
 
-      {/* Readiness Score */}
-      {readiness && (
-        <div className="bg-white rounded-2xl p-6 shadow-card border border-gray-100">
-          <h3 className="font-semibold text-gray-900 mb-4">Placement Readiness Score</h3>
-          <div className="flex items-center gap-6 mb-4">
-            <div className="relative w-20 h-20">
-              <svg className="w-20 h-20 transform -rotate-90" viewBox="0 0 36 36">
-                <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                  fill="none" stroke="#e5e7eb" strokeWidth="3" />
-                <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                  fill="none" stroke="#4f46e5" strokeWidth="3"
-                  strokeDasharray={`${readiness.overall_score}, 100`} />
-              </svg>
-              <span className="absolute inset-0 flex items-center justify-center text-lg font-bold text-primary-600">
-                {readiness.overall_score}%
-              </span>
-            </div>
-            <div className="flex-1 grid grid-cols-2 md:grid-cols-3 gap-3">
-              <ReadinessItem label="Resume" value={readiness.resume_completion} />
-              <ReadinessItem label="Coding" value={readiness.coding_solved} />
-              <ReadinessItem label="Roadmap" value={readiness.roadmap_progress} />
-              <ReadinessItem label="Profile" value={readiness.profile_completion} />
-              <ReadinessItem label="Contests" value={readiness.contests_participated} />
-              <ReadinessItem label="Assignments" value={readiness.assignments_completed} />
-            </div>
+      {/* Readiness Breakdown */}
+      {readiness && readiness.overall_score > 0 && (
+        <div className="card-padded">
+          <h3 className="text-sm font-semibold text-surface-800 mb-3">Placement Readiness</h3>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            {[
+              { label: "Resume", value: readiness.resume_completion, color: "bg-blue-500" },
+              { label: "Coding", value: readiness.coding_solved, color: "bg-emerald-500" },
+              { label: "Roadmap", value: readiness.roadmap_progress, color: "bg-violet-500" },
+              { label: "Profile", value: readiness.profile_completion, color: "bg-amber-500" },
+              { label: "Contests", value: readiness.contests_participated, color: "bg-pink-500" },
+              { label: "Assignments", value: readiness.assignments_completed, color: "bg-indigo-500" },
+            ].map((item) => (
+              <div key={item.label}>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs text-surface-600">{item.label}</span>
+                  <span className="text-xs font-semibold text-surface-800">{item.value}%</span>
+                </div>
+                <div className="h-1.5 bg-surface-100 rounded-full overflow-hidden">
+                  <div className={`h-full rounded-full ${item.color} transition-all duration-700`} style={{ width: `${item.value}%` }} />
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}
 
-      {/* Tabs */}
-      <div className="flex gap-2 border-b border-gray-200">
-        {["list", "kanban"].map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`px-4 py-2 font-medium capitalize transition ${
-              activeTab === tab
-                ? "text-primary-600 border-b-2 border-primary-600"
-                : "text-gray-500 hover:text-gray-700"
-            }`}
-          >
-            {tab === "list" ? "List View" : "Kanban Board"}
+      {/* View Toggle + Filter */}
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="flex bg-surface-100 rounded-lg p-0.5">
+          <button onClick={() => setView("pipeline")}
+            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${view === "pipeline" ? "bg-white text-surface-900 shadow-sm" : "text-surface-500"}`}>
+            Pipeline
           </button>
-        ))}
+          <button onClick={() => setView("list")}
+            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${view === "list" ? "bg-white text-surface-900 shadow-sm" : "text-surface-500"}`}>
+            List
+          </button>
+        </div>
+        {view === "list" && (
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
+            className="text-xs border border-surface-200 rounded-lg px-2.5 py-1.5 bg-white text-surface-600 outline-none focus:ring-2 focus:ring-primary-100">
+            <option value="">All Stages</option>
+            {STAGES.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+          </select>
+        )}
       </div>
 
-      {/* Filter */}
-      <div className="flex gap-3 items-center">
-        <select
-          value={filterStatus}
-          onChange={(e) => setFilterStatus(e.target.value)}
-          className="px-3 py-2 border border-gray-200 rounded-lg text-sm"
-        >
-          <option value="">All Statuses</option>
-          {STATUS_OPTIONS.map((s) => (
-            <option key={s.value} value={s.value}>{s.label}</option>
-          ))}
-        </select>
-      </div>
-
-      {/* Applications List */}
-      {activeTab === "list" && (
-        <div className="space-y-3">
-          {applications.length === 0 ? (
-            <div className="text-center py-12 text-gray-500">
-              <p className="text-lg">No applications yet</p>
-              <p className="text-sm mt-1">Start tracking your placement journey</p>
-            </div>
-          ) : (
-            applications.map((app) => (
-              <div key={app.id} className="bg-white rounded-xl p-4 shadow-card border border-gray-100 hover:shadow-card-hover transition">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3">
-                      <h3 className="font-semibold text-gray-900">{app.company_name}</h3>
-                      {getStatusBadge(app.status)}
-                    </div>
-                    <p className="text-sm text-gray-600 mt-1">{app.role}</p>
-                    <div className="flex gap-4 mt-2 text-xs text-gray-500">
-                      {app.package_lpa && <span>₹{app.package_lpa} LPA</span>}
-                      {app.location && <span>📍 {app.location}</span>}
-                      {app.days_left !== null && app.days_left >= 0 && (
-                        <span className="text-amber-600">{app.days_left} days left</span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex gap-2">
-                    <select
-                      value={app.status}
-                      onChange={(e) => handleStatusChange(app.id, e.target.value)}
-                      className="text-xs border border-gray-200 rounded-lg px-2 py-1"
-                    >
-                      {STATUS_OPTIONS.map((s) => (
-                        <option key={s.value} value={s.value}>{s.label}</option>
-                      ))}
-                    </select>
-                    <button onClick={() => handleEdit(app)} className="text-gray-400 hover:text-primary-600 text-sm">✏️</button>
-                    <button onClick={() => handleDelete(app.id)} className="text-gray-400 hover:text-red-600 text-sm">🗑️</button>
-                  </div>
+      {/* Pipeline View */}
+      {view === "pipeline" && (
+        <div className="overflow-x-auto -mx-4 px-4 pb-4">
+          <div className="flex gap-3 min-w-max">
+            {STAGES.filter((s) => grouped[s.id]?.length > 0 || ["wishlist", "applied", "shortlisted", "offer_received", "rejected"].includes(s.id)).map((stage) => (
+              <div key={stage.id} className="w-64 flex-shrink-0">
+                <div className="flex items-center gap-2 mb-3 px-1">
+                  <span className="text-sm">{stage.icon}</span>
+                  <span className="text-xs font-semibold text-surface-700">{stage.label}</span>
+                  <span className="text-xs text-surface-400 bg-surface-100 px-1.5 py-0.5 rounded-full">
+                    {grouped[stage.id]?.length || 0}
+                  </span>
+                </div>
+                <div className="space-y-2 min-h-[100px] p-2 rounded-xl bg-surface-50 border border-surface-100">
+                  {grouped[stage.id]?.length === 0 ? (
+                    <p className="text-xs text-surface-400 text-center py-6">No applications</p>
+                  ) : (
+                    grouped[stage.id].map((app) => (
+                      <AppCard key={app.id} app={app} onClick={handleCardClick} onStatusChange={handleStatusChange} onDelete={handleDelete} />
+                    ))
+                  )}
                 </div>
               </div>
-            ))
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* List View */}
+      {view === "list" && (
+        <div className="space-y-2">
+          {filteredApps.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16">
+              <div className="w-16 h-16 rounded-2xl bg-surface-100 flex items-center justify-center mb-4">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-surface-400">
+                  <rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/>
+                </svg>
+              </div>
+              <p className="text-base font-medium text-surface-700">No applications yet</p>
+              <p className="text-sm text-surface-400 mt-1">Start tracking your placement journey</p>
+            </div>
+          ) : (
+            filteredApps.map((app) => {
+              const stage = STAGE_MAP[app.status] || STAGES[0];
+              return (
+                <div key={app.id} className="card-padded flex items-center gap-4 hover:shadow-card-hover transition-all cursor-pointer" onClick={() => handleCardClick(app)}>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-sm font-semibold text-surface-800">{app.company_name}</h4>
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-2xs font-medium ${stage.color}`}>
+                        {stage.icon} {stage.label}
+                      </span>
+                    </div>
+                    <p className="text-xs text-surface-500 mt-0.5">
+                      {app.role}
+                      {app.package_lpa && ` · ₹${app.package_lpa}L`}
+                      {app.location && ` · ${app.location}`}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {app.deadline && (
+                      <span className="text-xs text-surface-400">
+                        {new Date(app.deadline).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                      </span>
+                    )}
+                    <button onClick={(e) => { e.stopPropagation(); handleDelete(app.id); }}
+                      className="p-1.5 text-surface-300 hover:text-danger-500 rounded-lg hover:bg-danger-50 transition-colors">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                    </button>
+                  </div>
+                </div>
+              );
+            })
           )}
         </div>
       )}
 
-      {/* Kanban View */}
-      {activeTab === "kanban" && <KanbanBoard applications={applications} onStatusChange={handleStatusChange} />}
-
-      {/* Add/Edit Form Modal */}
-      {showForm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            <h2 className="text-xl font-bold mb-4">
-              {editingApp ? "Edit Application" : "Add Application"}
-            </h2>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Company Name *</label>
-                  <input type="text" required value={formData.company_name}
-                    onChange={(e) => setFormData({ ...formData, company_name: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent" />
-                </div>
-                <div className="col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Role *</label>
-                  <input type="text" required value={formData.role}
-                    onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Package (LPA)</label>
-                  <input type="number" step="0.01" value={formData.package_lpa}
-                    onChange={(e) => setFormData({ ...formData, package_lpa: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                  <select value={formData.status}
-                    onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent">
-                    {STATUS_OPTIONS.map((s) => (
-                      <option key={s.value} value={s.value}>{s.label}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Application Date</label>
-                  <input type="date" value={formData.application_date}
-                    onChange={(e) => setFormData({ ...formData, application_date: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Deadline</label>
-                  <input type="date" value={formData.deadline}
-                    onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
-                  <input type="text" value={formData.location}
-                    onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Job Type</label>
-                  <select value={formData.job_type}
-                    onChange={(e) => setFormData({ ...formData, job_type: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent">
-                    {JOB_TYPES.map((t) => (
-                      <option key={t.value} value={t.value}>{t.label}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Job Link</label>
-                  <input type="url" value={formData.job_link}
-                    onChange={(e) => setFormData({ ...formData, job_link: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent" />
-                </div>
-                <div className="col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
-                  <textarea rows={3} value={formData.notes}
-                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent" />
-                </div>
-              </div>
-              <div className="flex gap-3 pt-2">
-                <button type="submit" className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-xl hover:bg-primary-700 transition font-medium">
-                  {editingApp ? "Update" : "Add Application"}
-                </button>
-                <button type="button" onClick={() => { setShowForm(false); setEditingApp(null); }}
-                  className="px-4 py-2 border border-gray-200 rounded-xl hover:bg-gray-50 transition">
-                  Cancel
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* Add/Edit Modal */}
+      <AddAppModal
+        isOpen={showModal}
+        onClose={() => { setShowModal(false); setEditApp(null); }}
+        onAdd={handleAdd}
+        editApp={editApp}
+      />
     </div>
   );
 }
-
-function StatCard({ label, value, color }) {
-  const colors = {
-    blue: "bg-blue-50 text-blue-700",
-    amber: "bg-amber-50 text-amber-700",
-    green: "bg-green-50 text-green-700",
-    red: "bg-red-50 text-red-700",
-    gray: "bg-gray-50 text-gray-700",
-  };
-  return (
-    <div className={`rounded-xl p-4 ${colors[color]}`}>
-      <p className="text-2xl font-bold">{value || 0}</p>
-      <p className="text-sm opacity-80">{label}</p>
-    </div>
-  );
-}
-
-function ReadinessItem({ label, value }) {
-  return (
-    <div>
-      <div className="flex justify-between text-xs text-gray-600 mb-1">
-        <span>{label}</span>
-        <span>{value}%</span>
-      </div>
-      <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-        <div className="h-full bg-primary-500 rounded-full transition-all" style={{ width: `${value}%` }} />
-      </div>
-    </div>
-  );
-}
-
-function KanbanBoard({ applications, onStatusChange }) {
-  const columns = STATUS_OPTIONS.slice(0, 6); // Show first 6 statuses in kanban
-  return (
-    <div className="flex gap-4 overflow-x-auto pb-4">
-      {columns.map((col) => {
-        const items = applications.filter((a) => a.status === col.value);
-        return (
-          <div key={col.value} className="min-w-[250px] flex-shrink-0">
-            <div className={`px-3 py-2 rounded-t-lg ${col.color} font-medium text-sm`}>
-              {col.label} ({items.length})
-            </div>
-            <div className="bg-gray-50 rounded-b-lg p-2 space-y-2 min-h-[200px]">
-              {items.map((app) => (
-                <div key={app.id} className="bg-white rounded-lg p-3 shadow-sm border border-gray-100">
-                  <p className="font-medium text-sm text-gray-900">{app.company_name}</p>
-                  <p className="text-xs text-gray-500">{app.role}</p>
-                  {app.package_lpa && <p className="text-xs text-green-600 mt-1">₹{app.package_lpa} LPA</p>}
-                </div>
-              ))}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-export default PlacementPage;

@@ -4,33 +4,130 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Coding Hub | CampusHub</title>
+    <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
     <link rel="stylesheet" href="/assets/css/variables.css">
     <link rel="stylesheet" href="/assets/css/base.css">
     <link rel="stylesheet" href="/assets/css/components.css">
     <link rel="stylesheet" href="/assets/css/utilities.css">
     <link rel="stylesheet" href="/assets/css/layout.css">
+    <link rel="stylesheet" href="/assets/css/sidebar.css">
     <style>
-        .problem-card { padding: var(--space-4); border: 1px solid var(--gray-100); border-radius: var(--radius-lg); transition: all var(--transition-fast); cursor: pointer; }
-        .problem-card:hover { border-color: var(--primary-200); background: var(--primary-50); transform: translateY(-1px); }
+        .coding-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: var(--space-4);
+            margin-bottom: var(--space-5);
+            flex-wrap: wrap;
+        }
+        .coding-stats {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: var(--space-3);
+            margin-bottom: var(--space-5);
+        }
+        .coding-stat {
+            text-align: center;
+            padding: var(--space-4);
+            background: var(--surface-card);
+            border: 1px solid var(--border-primary);
+            border-radius: var(--radius-xl);
+            transition: all var(--transition-fast);
+        }
+        .coding-stat:hover { border-color: var(--gray-300); transform: translateY(-1px); }
+        .coding-stat-value {
+            font-size: var(--text-2xl);
+            font-weight: var(--font-bold);
+            color: var(--gray-900);
+            font-variant-numeric: tabular-nums;
+        }
+        .coding-stat-label {
+            font-size: var(--text-xs);
+            color: var(--gray-500);
+            margin-top: var(--space-1);
+        }
+
+        .problem-filters {
+            display: flex;
+            align-items: center;
+            gap: var(--space-3);
+            margin-bottom: var(--space-4);
+            flex-wrap: wrap;
+        }
+
+        .problem-list { display: flex; flex-direction: column; }
+        .problem-row {
+            display: grid;
+            grid-template-columns: 1fr auto auto auto;
+            align-items: center;
+            gap: var(--space-4);
+            padding: var(--space-3) var(--space-4);
+            border-bottom: 1px solid var(--border-secondary);
+            transition: background var(--transition-fast);
+            text-decoration: none;
+            color: inherit;
+        }
+        .problem-row:hover { background: var(--surface-hover); }
+        .problem-row:last-child { border-bottom: none; }
+
+        .problem-title {
+            font-size: var(--text-sm);
+            font-weight: var(--font-medium);
+            color: var(--gray-900);
+        }
+        .problem-tags {
+            display: flex;
+            gap: var(--space-1);
+            flex-wrap: wrap;
+            margin-top: var(--space-1);
+        }
+        .problem-tag {
+            font-size: var(--text-2xs);
+            padding: 0.0625rem 0.375rem;
+            background: var(--gray-100);
+            color: var(--gray-600);
+            border-radius: var(--radius-sm);
+        }
+
         .difficulty-easy { color: var(--success-600); }
         .difficulty-medium { color: var(--warning-600); }
         .difficulty-hard { color: var(--danger-600); }
+
+        .solved-icon {
+            width: 20px;
+            height: 20px;
+            border-radius: var(--radius-full);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .solved-icon.yes { background: var(--success-50); color: var(--success-600); }
+        .solved-icon.no { background: var(--gray-100); color: var(--gray-400); }
+
+        @media (max-width: 768px) {
+            .coding-stats { grid-template-columns: repeat(2, 1fr); }
+            .problem-row { grid-template-columns: 1fr auto; }
+            .problem-row > *:nth-child(3),
+            .problem-row > *:nth-child(4) { display: none; }
+        }
     </style>
 </head>
 <body>
     <div class="app-layout" id="app"></div>
-
     <script src="/assets/js/config.js"></script>
     <script src="/assets/js/api.js"></script>
     <script src="/assets/js/auth.js"></script>
     <script src="/assets/js/utils.js"></script>
+    <script src="/assets/js/sidebar.js"></script>
     <script src="/assets/js/components.js"></script>
     <script>
         if (!Auth.requireAuth()) throw new Error('Not authenticated');
         Components.initLayout('coding', 'Coding Hub');
 
         let currentPage = 1;
-        let currentFilters = { difficulty: '', topic: '', search: '' };
+        let currentDifficulty = '';
+        let currentSearch = '';
+        let currentTag = '';
 
         loadCodingHub();
 
@@ -38,173 +135,150 @@
             const content = document.getElementById('pageContent');
             content.innerHTML = `
             <div class="animate-fade-in">
+                <!-- Header -->
+                <div class="coding-header">
+                    <div>
+                        <h2 class="page-title">Coding Hub</h2>
+                        <p class="page-subtitle">Practice problems, improve your skills, climb the ranks</p>
+                    </div>
+                    <a href="/pages/student/contests.html" class="btn btn-primary btn-sm">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
+                        View Contests
+                    </a>
+                </div>
+
                 <!-- Stats -->
-                <div class="grid grid-cols-4 gap-4 mb-6" id="codingStats">
+                <div class="coding-stats" id="codingStats">
                     ${Components.renderSkeleton('card', 4)}
                 </div>
 
-                <!-- Filters -->
-                <div class="card mb-6">
-                    <div class="flex items-center gap-4 flex-wrap">
-                        <div class="search-bar" style="max-width:300px">
-                            <span class="search-icon">🔍</span>
-                            <input type="text" placeholder="Search problems..." id="searchInput" 
-                                   oninput="debouncedSearch(this.value)">
+                <!-- Problem List -->
+                <div class="card" style="padding:0;overflow:hidden">
+                    <div style="padding:var(--space-4) var(--space-5);border-bottom:1px solid var(--border-primary)">
+                        <div class="problem-filters">
+                            <div class="search-bar" style="max-width:240px">
+                                <span class="search-icon">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                                </span>
+                                <input type="text" placeholder="Search problems..." id="searchInput" oninput="debounceSearch(this.value)">
+                            </div>
+                            <div class="filter-chips" id="difficultyFilters">
+                                <span class="chip active" onclick="filterDifficulty('')">All</span>
+                                <span class="chip" onclick="filterDifficulty('easy')">Easy</span>
+                                <span class="chip" onclick="filterDifficulty('medium')">Medium</span>
+                                <span class="chip" onclick="filterDifficulty('hard')">Hard</span>
+                            </div>
                         </div>
-                        <select class="form-input" style="width:auto" id="difficultyFilter" onchange="applyFilters()">
-                            <option value="">All Difficulties</option>
-                            <option value="easy">Easy</option>
-                            <option value="medium">Medium</option>
-                            <option value="hard">Hard</option>
-                        </select>
-                        <select class="form-input" style="width:auto" id="languageFilter" onchange="applyFilters()">
-                            <option value="">All Languages</option>
-                            <option value="python">Python</option>
-                            <option value="java">Java</option>
-                            <option value="c">C</option>
-                            <option value="cpp">C++</option>
-                            <option value="javascript">JavaScript</option>
-                        </select>
                     </div>
-                    <div class="filter-chips mt-3" id="topicChips"></div>
-                </div>
-
-                <!-- Problems List -->
-                <div class="card">
-                    <div class="card-header">
-                        <h3 class="card-title">Problems</h3>
-                        <span class="text-sm text-gray-500" id="problemCount"></span>
-                    </div>
-                    <div id="problemsList">
-                        ${Components.renderSkeleton('text', 5)}
-                    </div>
-                    <div id="pagination"></div>
+                    <div id="problemList">${Components.renderSkeleton('row', 8)}</div>
+                    <div id="pagination" style="padding:var(--space-4)"></div>
                 </div>
             </div>`;
 
-            loadCodingStats();
-            loadTopics();
+            loadStats();
             loadProblems();
         }
 
-        async function loadCodingStats() {
+        async function loadStats() {
             const el = document.getElementById('codingStats');
             try {
                 const data = await API.get('/questions/my-stats');
-                const stats = data?.data || {};
+                const s = data?.data || {};
                 el.innerHTML = `
-                    <div class="stat-card">
-                        <div class="stat-icon green">✅</div>
-                        <div class="stat-content">
-                            <div class="stat-value">${stats.solved || 0}</div>
-                            <div class="stat-label">Problems Solved</div>
-                        </div>
+                    <div class="coding-stat">
+                        <div class="coding-stat-value">${s.solved || 0}</div>
+                        <div class="coding-stat-label">Solved</div>
                     </div>
-                    <div class="stat-card">
-                        <div class="stat-icon blue">📊</div>
-                        <div class="stat-content">
-                            <div class="stat-value">${stats.submissions || 0}</div>
-                            <div class="stat-label">Submissions</div>
-                        </div>
+                    <div class="coding-stat">
+                        <div class="coding-stat-value">${s.accuracy || 0}%</div>
+                        <div class="coding-stat-label">Accuracy</div>
                     </div>
-                    <div class="stat-card">
-                        <div class="stat-icon yellow">🎯</div>
-                        <div class="stat-content">
-                            <div class="stat-value">${stats.accuracy || 0}%</div>
-                            <div class="stat-label">Accuracy</div>
-                        </div>
+                    <div class="coding-stat">
+                        <div class="coding-stat-value">${s.streak || 0}</div>
+                        <div class="coding-stat-label">Day Streak</div>
                     </div>
-                    <div class="stat-card">
-                        <div class="stat-icon purple">🔥</div>
-                        <div class="stat-content">
-                            <div class="stat-value">${stats.streak || 0}</div>
-                            <div class="stat-label">Day Streak</div>
-                        </div>
-                    </div>
-                `;
+                    <div class="coding-stat">
+                        <div class="coding-stat-value">${s.total_submissions || 0}</div>
+                        <div class="coding-stat-label">Submissions</div>
+                    </div>`;
             } catch (e) {
                 el.innerHTML = '';
             }
         }
 
-        async function loadTopics() {
-            try {
-                const data = await API.get('/questions/tags');
-                const tags = data?.data || [];
-                const el = document.getElementById('topicChips');
-                el.innerHTML = tags.slice(0, 10).map(tag => `
-                    <button class="chip" onclick="toggleTopic(this, '${tag.name || tag}')">${tag.name || tag}</button>
-                `).join('');
-            } catch (e) {}
-        }
-
         async function loadProblems() {
-            const el = document.getElementById('problemsList');
-            const params = { page: currentPage, page_size: 20 };
-            if (currentFilters.difficulty) params.difficulty = currentFilters.difficulty;
-            if (currentFilters.topic) params.topic = currentFilters.topic;
-            if (currentFilters.search) params.search = currentFilters.search;
-
+            const el = document.getElementById('problemList');
             try {
-                const data = await API.get('/questions', params);
-                const problems = data?.data?.results || data?.data || [];
-                const total = data?.data?.count || problems.length;
-                
-                document.getElementById('problemCount').textContent = `${total} problems`;
+                const params = { page: currentPage, page_size: 20 };
+                if (currentDifficulty) params.difficulty = currentDifficulty;
+                if (currentSearch) params.search = currentSearch;
+                if (currentTag) params.tag = currentTag;
 
-                if (problems.length === 0) {
+                const data = await API.get('/questions', params);
+                const items = data?.data?.results || data?.data || [];
+                const total = data?.data?.count || items.length;
+                const totalPages = Math.ceil(total / 20);
+
+                if (items.length === 0) {
                     el.innerHTML = Components.renderEmptyState('💻', 'No problems found', 'Try adjusting your filters');
+                    document.getElementById('pagination').innerHTML = '';
                     return;
                 }
 
-                el.innerHTML = problems.map(p => `
-                    <div class="problem-card" onclick="window.location.href='/pages/student/coding-detail.html?id=${p.id}'">
-                        <div class="flex items-center justify-between">
-                            <div class="flex-1">
-                                <h4 class="text-sm font-semibold text-gray-900">${Utils.escapeHtml(p.title)}</h4>
-                                <div class="flex items-center gap-3 mt-1">
-                                    <span class="text-xs difficulty-${(p.difficulty || '').toLowerCase()}">${Utils.escapeHtml(p.difficulty || '')}</span>
-                                    ${(p.tags || []).slice(0, 3).map(t => `<span class="badge badge-gray">${Utils.escapeHtml(t.name || t)}</span>`).join('')}
-                                </div>
-                            </div>
-                            <div class="flex items-center gap-3">
-                                ${p.is_solved ? '<span class="badge badge-success">Solved</span>' : ''}
-                                <span class="text-xs text-gray-400">${p.submission_count || 0} submissions</span>
-                            </div>
+                el.innerHTML = `
+                    <div class="problem-list">
+                        <div class="problem-row" style="background:var(--surface-secondary);font-size:var(--text-xs);font-weight:var(--font-medium);color:var(--gray-500);text-transform:uppercase;letter-spacing:0.04em">
+                            <span>Problem</span>
+                            <span>Difficulty</span>
+                            <span>Acceptance</span>
+                            <span>Status</span>
                         </div>
-                    </div>
-                `).join('');
+                        ${items.map(item => `
+                            <a href="/pages/student/coding-problem.html?id=${item.id}" class="problem-row">
+                                <div>
+                                    <div class="problem-title">${Utils.escapeHtml(item.title)}</div>
+                                    <div class="problem-tags">
+                                        ${(item.tags || []).slice(0, 3).map(t => `<span class="problem-tag">${Utils.escapeHtml(t)}</span>`).join('')}
+                                    </div>
+                                </div>
+                                <span class="badge badge-${item.difficulty === 'easy' ? 'success' : item.difficulty === 'medium' ? 'warning' : 'danger'}">${Utils.escapeHtml(item.difficulty || 'Medium')}</span>
+                                <span class="text-xs text-gray-500">${item.acceptance_rate || '—'}%</span>
+                                <div class="solved-icon ${item.is_solved ? 'yes' : 'no'}">
+                                    ${item.is_solved ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : '○'}
+                                </div>
+                            </a>
+                        `).join('')}
+                    </div>`;
 
-                const totalPages = Math.ceil(total / 20);
                 document.getElementById('pagination').innerHTML = Components.renderPagination(currentPage, totalPages, 'goToPage');
             } catch (e) {
-                el.innerHTML = `<p class="text-danger text-sm">Failed to load problems: ${e.message}</p>`;
+                el.innerHTML = '<p class="text-sm text-gray-500 p-5">Unable to load problems</p>';
             }
+        }
+
+        function filterDifficulty(diff) {
+            currentDifficulty = diff;
+            currentPage = 1;
+            document.querySelectorAll('#difficultyFilters .chip').forEach(c => c.classList.remove('active'));
+            event.target.classList.add('active');
+            loadProblems();
+        }
+
+        let searchTimeout;
+        function debounceSearch(val) {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                currentSearch = val;
+                currentPage = 1;
+                loadProblems();
+            }, 300);
         }
 
         function goToPage(page) {
             currentPage = page;
             loadProblems();
+            document.getElementById('problemList').scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
-
-        function applyFilters() {
-            currentFilters.difficulty = document.getElementById('difficultyFilter').value;
-            currentPage = 1;
-            loadProblems();
-        }
-
-        function toggleTopic(btn, topic) {
-            btn.classList.toggle('active');
-            currentFilters.topic = btn.classList.contains('active') ? topic : '';
-            currentPage = 1;
-            loadProblems();
-        }
-
-        const debouncedSearch = Utils.debounce((value) => {
-            currentFilters.search = value;
-            currentPage = 1;
-            loadProblems();
-        }, 400);
     </script>
 </body>
 </html>

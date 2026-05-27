@@ -4,26 +4,125 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Resources | CampusHub</title>
+    <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
     <link rel="stylesheet" href="/assets/css/variables.css">
     <link rel="stylesheet" href="/assets/css/base.css">
     <link rel="stylesheet" href="/assets/css/components.css">
     <link rel="stylesheet" href="/assets/css/utilities.css">
     <link rel="stylesheet" href="/assets/css/layout.css">
+    <link rel="stylesheet" href="/assets/css/sidebar.css">
+    <style>
+        .resources-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: var(--space-5);
+            gap: var(--space-3);
+            flex-wrap: wrap;
+        }
+        .resources-toolbar {
+            display: flex;
+            align-items: center;
+            gap: var(--space-3);
+            margin-bottom: var(--space-4);
+            flex-wrap: wrap;
+        }
+        .resource-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: var(--space-4);
+        }
+        .resource-card {
+            background: var(--surface-card);
+            border: 1px solid var(--border-primary);
+            border-radius: var(--radius-xl);
+            padding: var(--space-5);
+            transition: all var(--transition-moderate);
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+        }
+        .resource-card:hover {
+            border-color: var(--primary-200);
+            box-shadow: var(--shadow-card-hover);
+            transform: translateY(-2px);
+        }
+        .resource-card-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: var(--radius-xl);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: var(--text-xl);
+            margin-bottom: var(--space-3);
+        }
+        .resource-card-icon.pdf { background: var(--danger-50); }
+        .resource-card-icon.doc { background: var(--info-50); }
+        .resource-card-icon.ppt { background: var(--warning-50); }
+        .resource-card-icon.other { background: var(--gray-100); }
+        .resource-card-title {
+            font-size: var(--text-sm);
+            font-weight: var(--font-semibold);
+            color: var(--gray-900);
+            margin-bottom: var(--space-1);
+            line-height: var(--leading-snug);
+        }
+        .resource-card-meta {
+            font-size: var(--text-xs);
+            color: var(--gray-500);
+            margin-bottom: var(--space-3);
+        }
+        .resource-card-footer {
+            margin-top: auto;
+            padding-top: var(--space-3);
+            border-top: 1px solid var(--border-secondary);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .resource-card-actions {
+            display: flex;
+            gap: var(--space-1);
+        }
+
+        .view-toggle {
+            display: flex;
+            background: var(--gray-100);
+            border-radius: var(--radius-lg);
+            padding: 2px;
+        }
+        .view-toggle-btn {
+            padding: var(--space-1-5) var(--space-2-5);
+            border-radius: var(--radius-md);
+            color: var(--gray-500);
+            transition: all var(--transition-fast);
+            display: flex;
+            align-items: center;
+        }
+        .view-toggle-btn.active {
+            background: var(--surface-primary);
+            color: var(--gray-900);
+            box-shadow: var(--shadow-sm);
+        }
+    </style>
 </head>
 <body>
     <div class="app-layout" id="app"></div>
-
     <script src="/assets/js/config.js"></script>
     <script src="/assets/js/api.js"></script>
     <script src="/assets/js/auth.js"></script>
     <script src="/assets/js/utils.js"></script>
+    <script src="/assets/js/sidebar.js"></script>
     <script src="/assets/js/components.js"></script>
     <script>
         if (!Auth.requireAuth()) throw new Error('Not authenticated');
-        Components.initLayout('resources', 'Academic Resources');
+        Components.initLayout('resources', 'Resources');
 
         let currentPage = 1;
-        let searchQuery = '';
+        let currentSubject = '';
+        let currentSearch = '';
+        let viewMode = 'grid';
 
         loadResources();
 
@@ -31,16 +130,34 @@
             const content = document.getElementById('pageContent');
             content.innerHTML = `
             <div class="animate-fade-in">
-                <div class="flex items-center justify-between mb-6 flex-wrap gap-4">
-                    <div class="search-bar">
-                        <span class="search-icon">🔍</span>
-                        <input type="text" placeholder="Search resources..." id="searchInput" 
-                               oninput="debouncedSearch(this.value)">
+                <div class="resources-header">
+                    <div>
+                        <h2 class="page-title">Academic Resources</h2>
+                        <p class="page-subtitle">Study materials, notes, and reference documents</p>
                     </div>
                 </div>
-                <div class="grid grid-cols-3 gap-4" id="resourcesGrid">
-                    ${Components.renderSkeleton('card', 6)}
+
+                <div class="resources-toolbar">
+                    <div class="search-bar" style="max-width:280px">
+                        <span class="search-icon">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                        </span>
+                        <input type="text" placeholder="Search resources..." id="searchInput" oninput="debounceSearch(this.value)">
+                    </div>
+                    <div class="filter-chips" id="subjectFilters">
+                        <span class="chip active" onclick="filterSubject('')">All</span>
+                    </div>
+                    <div class="view-toggle ml-auto">
+                        <button class="view-toggle-btn active" onclick="setView('grid')" aria-label="Grid view">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+                        </button>
+                        <button class="view-toggle-btn" onclick="setView('list')" aria-label="List view">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+                        </button>
+                    </div>
                 </div>
+
+                <div id="resourcesContainer">${Components.renderSkeleton('card', 6)}</div>
                 <div id="pagination"></div>
             </div>`;
 
@@ -48,54 +165,77 @@
         }
 
         async function fetchResources() {
-            const grid = document.getElementById('resourcesGrid');
-            const params = { page: currentPage, page_size: 12 };
-            if (searchQuery) params.search = searchQuery;
-
+            const container = document.getElementById('resourcesContainer');
             try {
-                const data = await API.get('/resources', params);
-                const resources = data?.data?.results || data?.data || [];
-                const total = data?.data?.count || resources.length;
+                const params = { page: currentPage, page_size: 12 };
+                if (currentSubject) params.subject = currentSubject;
+                if (currentSearch) params.search = currentSearch;
 
-                if (resources.length === 0) {
-                    grid.innerHTML = Components.renderEmptyState('📚', 'No resources found', 'Try a different search term');
+                const data = await API.get('/resources', params);
+                const items = data?.data?.results || data?.data || [];
+                const total = data?.data?.count || items.length;
+
+                if (items.length === 0) {
+                    container.innerHTML = Components.renderEmptyState('📚', 'No resources found', 'Try adjusting your search or filters');
                     return;
                 }
 
-                grid.innerHTML = resources.map(r => `
-                    <div class="card cursor-pointer" onclick="window.location.href='/pages/student/resource-detail.html?id=${r.id}'">
-                        <div class="flex items-start gap-3">
-                            <div class="stat-icon blue" style="width:40px;height:40px;font-size:1rem">📄</div>
-                            <div class="flex-1">
-                                <h4 class="text-sm font-semibold text-gray-900 line-clamp-2">${Utils.escapeHtml(r.title)}</h4>
-                                <p class="text-xs text-gray-500 mt-1">${Utils.escapeHtml(r.subject || r.category || '')}</p>
-                                <div class="flex items-center gap-2 mt-2">
-                                    <span class="badge badge-gray">${Utils.escapeHtml(r.file_type || 'PDF')}</span>
-                                    <span class="text-xs text-gray-400">${Utils.formatFileSize(r.file_size)}</span>
+                container.innerHTML = `<div class="resource-grid">${items.map(item => {
+                    const ext = getFileExtension(item.file_name || item.title || '');
+                    const iconClass = ext === 'pdf' ? 'pdf' : ext === 'doc' || ext === 'docx' ? 'doc' : ext === 'ppt' || ext === 'pptx' ? 'ppt' : 'other';
+                    const icon = ext === 'pdf' ? '📕' : ext === 'doc' || ext === 'docx' ? '📘' : ext === 'ppt' || ext === 'pptx' ? '📙' : '📄';
+                    return `
+                        <div class="resource-card" onclick="window.location.href='/pages/student/resource-detail.html?id=${item.id}'">
+                            <div class="resource-card-icon ${iconClass}">${icon}</div>
+                            <div class="resource-card-title line-clamp-2">${Utils.escapeHtml(item.title)}</div>
+                            <div class="resource-card-meta">${Utils.escapeHtml(item.subject || '')} ${item.uploaded_at ? '· ' + Utils.timeAgo(item.uploaded_at) : ''}</div>
+                            <div class="resource-card-footer">
+                                <span class="badge badge-gray">${ext.toUpperCase() || 'FILE'}</span>
+                                <div class="resource-card-actions">
+                                    <button class="btn-icon btn-icon-sm" onclick="event.stopPropagation()" data-tooltip="Save">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+                                    </button>
+                                    <button class="btn-icon btn-icon-sm" onclick="event.stopPropagation()" data-tooltip="Download">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                                    </button>
                                 </div>
                             </div>
-                        </div>
-                        <div class="flex items-center justify-between mt-3 pt-3 border-t">
-                            <span class="text-xs text-gray-400">${Utils.timeAgo(r.created_at)}</span>
-                            <span class="text-xs text-gray-500">⬇ ${r.download_count || 0}</span>
-                        </div>
-                    </div>
-                `).join('');
+                        </div>`;
+                }).join('')}</div>`;
 
                 const totalPages = Math.ceil(total / 12);
                 document.getElementById('pagination').innerHTML = Components.renderPagination(currentPage, totalPages, 'goToPage');
             } catch (e) {
-                grid.innerHTML = `<p class="text-danger">Failed to load resources: ${e.message}</p>`;
+                container.innerHTML = '<p class="text-sm text-gray-500 p-4">Unable to load resources</p>';
             }
         }
 
-        function goToPage(page) { currentPage = page; fetchResources(); }
+        function getFileExtension(filename) {
+            return (filename.split('.').pop() || '').toLowerCase();
+        }
 
-        const debouncedSearch = Utils.debounce((value) => {
-            searchQuery = value;
+        function filterSubject(subject) {
+            currentSubject = subject;
             currentPage = 1;
+            document.querySelectorAll('#subjectFilters .chip').forEach(c => c.classList.remove('active'));
+            event.target.classList.add('active');
             fetchResources();
-        }, 400);
+        }
+
+        let searchTimeout;
+        function debounceSearch(val) {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => { currentSearch = val; currentPage = 1; fetchResources(); }, 300);
+        }
+
+        function setView(mode) {
+            viewMode = mode;
+            document.querySelectorAll('.view-toggle-btn').forEach(b => b.classList.remove('active'));
+            event.target.closest('.view-toggle-btn').classList.add('active');
+            fetchResources();
+        }
+
+        function goToPage(page) { currentPage = page; fetchResources(); }
     </script>
 </body>
 </html>

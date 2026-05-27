@@ -1,31 +1,40 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CampusHub</title>
-    <meta name="description" content="CampusHub - Your Complete Campus Management Platform">
-    <link rel="stylesheet" href="/assets/css/variables.css">
-    <link rel="stylesheet" href="/assets/css/base.css">
-    <link rel="stylesheet" href="/assets/css/components.css">
-    <link rel="stylesheet" href="/assets/css/utilities.css">
-    <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
-    <script>
-        // Redirect to appropriate page based on auth state
-        (function() {
-            const token = localStorage.getItem('access_token');
-            if (token) {
-                window.location.href = '/pages/student/dashboard.html';
-            } else {
-                window.location.href = '/pages/auth/login.html';
-            }
-        })();
-    </script>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CampusHub — Student Portal</title>
+    <meta name="description" content="CampusHub - Access academic resources, practice coding, track attendance, and stay updated with campus news." />
+    <meta name="theme-color" content="#4f46e5" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+    <!-- Inline critical CSS for initial load -->
+    <style>
+      body { margin: 0; background: #f8fafc; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
+      #root:empty {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+      }
+      #root:empty::after {
+        content: '';
+        width: 32px;
+        height: 32px;
+        border: 3px solid #e2e8f0;
+        border-top-color: #4f46e5;
+        border-radius: 50%;
+        animation: spin 0.6s linear infinite;
+      }
+      @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
 </head>
-<body>
-    <div class="page-loader">
-        <div class="spinner"></div>
-        <p>Loading CampusHub...</p>
-    </div>
+<body class="bg-surface-50 font-sans antialiased">
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
 </body>
 </html>

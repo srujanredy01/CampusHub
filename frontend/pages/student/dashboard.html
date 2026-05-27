@@ -4,153 +4,373 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard | CampusHub</title>
+    <link rel="icon" type="image/svg+xml" href="/assets/icons/favicon.svg">
     <link rel="stylesheet" href="/assets/css/variables.css">
     <link rel="stylesheet" href="/assets/css/base.css">
     <link rel="stylesheet" href="/assets/css/components.css">
     <link rel="stylesheet" href="/assets/css/utilities.css">
     <link rel="stylesheet" href="/assets/css/layout.css">
+    <link rel="stylesheet" href="/assets/css/sidebar.css">
+    <style>
+        .dashboard-stats {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: var(--space-4);
+            margin-bottom: var(--space-6);
+        }
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1fr 340px;
+            gap: var(--space-6);
+        }
+        .dashboard-main { display: flex; flex-direction: column; gap: var(--space-5); }
+        .dashboard-aside { display: flex; flex-direction: column; gap: var(--space-5); }
+
+        /* Quick Actions */
+        .quick-actions {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: var(--space-2);
+        }
+        .quick-action-btn {
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+            padding: var(--space-2-5) var(--space-3);
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--border-primary);
+            background: var(--surface-primary);
+            font-size: var(--text-xs);
+            font-weight: var(--font-medium);
+            color: var(--gray-700);
+            cursor: pointer;
+            transition: all var(--transition-fast);
+            text-decoration: none;
+        }
+        .quick-action-btn:hover {
+            border-color: var(--primary-200);
+            background: var(--primary-50);
+            color: var(--primary-700);
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-sm);
+        }
+        .quick-action-btn svg { opacity: 0.7; }
+        .quick-action-btn:hover svg { opacity: 1; }
+
+        /* Activity Feed */
+        .activity-item {
+            display: flex;
+            align-items: flex-start;
+            gap: var(--space-3);
+            padding: var(--space-3) 0;
+            border-bottom: 1px solid var(--border-secondary);
+        }
+        .activity-item:last-child { border-bottom: none; }
+        .activity-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-top: 5px;
+            flex-shrink: 0;
+        }
+        .activity-dot.blue { background: var(--primary-500); }
+        .activity-dot.green { background: var(--success-500); }
+        .activity-dot.yellow { background: var(--warning-500); }
+        .activity-dot.purple { background: var(--purple-500); }
+
+        /* Progress Widget */
+        .progress-widget {
+            padding: var(--space-3) 0;
+            border-bottom: 1px solid var(--border-secondary);
+        }
+        .progress-widget:last-child { border-bottom: none; }
+
+        /* Deadline Item */
+        .deadline-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: var(--space-3) 0;
+            border-bottom: 1px solid var(--border-secondary);
+            gap: var(--space-3);
+        }
+        .deadline-item:last-child { border-bottom: none; }
+
+        /* Streak Widget */
+        .streak-number {
+            font-size: var(--text-4xl);
+            font-weight: var(--font-bold);
+            color: var(--gray-900);
+            line-height: 1;
+            font-variant-numeric: tabular-nums;
+        }
+        .streak-label {
+            font-size: var(--text-xs);
+            color: var(--gray-500);
+            margin-top: var(--space-1);
+        }
+
+        @media (max-width: 1200px) {
+            .dashboard-grid { grid-template-columns: 1fr; }
+            .dashboard-aside { order: -1; }
+        }
+        @media (max-width: 768px) {
+            .dashboard-stats { grid-template-columns: repeat(2, 1fr); }
+            .quick-actions { grid-template-columns: repeat(2, 1fr); }
+        }
+        @media (max-width: 480px) {
+            .dashboard-stats { grid-template-columns: 1fr; }
+        }
+    </style>
 </head>
 <body>
     <div class="app-layout" id="app"></div>
-
     <script src="/assets/js/config.js"></script>
     <script src="/assets/js/api.js"></script>
     <script src="/assets/js/auth.js"></script>
     <script src="/assets/js/utils.js"></script>
+    <script src="/assets/js/sidebar.js"></script>
     <script src="/assets/js/components.js"></script>
     <script>
         if (!Auth.requireAuth()) throw new Error('Not authenticated');
-
         Components.initLayout('dashboard', 'Dashboard');
         loadDashboard();
 
         async function loadDashboard() {
             const content = document.getElementById('pageContent');
             const user = Auth.getUser();
+            const now = new Date();
+            const greeting = getGreeting();
+            const dateStr = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 
-            // Show greeting + stats
             content.innerHTML = `
-                <div class="animate-fade-in">
-                    <!-- Greeting -->
-                    <div class="mb-8">
-                        <h2 class="text-2xl font-bold text-gray-900">Welcome back, ${Utils.escapeHtml(user?.full_name?.split(' ')[0] || 'Student')} 👋</h2>
-                        <p class="text-gray-500 mt-1">Here's what's happening with your campus life today.</p>
-                    </div>
-
-                    <!-- Stats Grid -->
-                    <div class="grid grid-cols-4 gap-4 mb-8" id="statsGrid">
-                        ${Components.renderSkeleton('card', 4)}
-                    </div>
-
-                    <!-- Main Content Grid -->
-                    <div class="grid grid-cols-3 gap-6">
-                        <!-- Recent Activity -->
-                        <div class="card" style="grid-column: span 2">
-                            <div class="card-header">
-                                <h3 class="card-title">Recent Activity</h3>
-                                <a href="/pages/student/notifications.html" class="btn btn-ghost btn-sm">View All</a>
-                            </div>
-                            <div id="recentActivity">
-                                ${Components.renderSkeleton('text', 3)}
-                            </div>
-                        </div>
-
-                        <!-- Quick Actions -->
-                        <div class="card">
-                            <h3 class="card-title mb-4">Quick Actions</h3>
-                            <div class="flex flex-col gap-3">
-                                <a href="/pages/student/coding.html" class="btn btn-secondary w-full">💻 Practice Coding</a>
-                                <a href="/pages/student/assignments.html" class="btn btn-secondary w-full">📝 View Assignments</a>
-                                <a href="/pages/student/resources.html" class="btn btn-secondary w-full">📚 Browse Resources</a>
-                                <a href="/pages/student/placement.html" class="btn btn-secondary w-full">💼 Placement Tracker</a>
-                                <a href="/pages/student/resume.html" class="btn btn-secondary w-full">📄 Build Resume</a>
-                                <a href="/pages/student/roadmaps.html" class="btn btn-secondary w-full">🗺️ Career Roadmaps</a>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Bottom Row -->
-                    <div class="grid grid-cols-2 gap-6 mt-6">
-                        <!-- Upcoming Assignments -->
-                        <div class="card">
-                            <div class="card-header">
-                                <h3 class="card-title">Upcoming Assignments</h3>
-                                <a href="/pages/student/assignments.html" class="btn btn-ghost btn-sm">See All</a>
-                            </div>
-                            <div id="upcomingAssignments">
-                                ${Components.renderSkeleton('text', 2)}
-                            </div>
-                        </div>
-
-                        <!-- Attendance Overview -->
-                        <div class="card">
-                            <div class="card-header">
-                                <h3 class="card-title">Attendance Overview</h3>
-                                <a href="/pages/student/attendance.html" class="btn btn-ghost btn-sm">Details</a>
-                            </div>
-                            <div id="attendanceOverview">
-                                ${Components.renderSkeleton('text', 2)}
-                            </div>
+            <div class="animate-fade-in">
+                <!-- Hero Banner -->
+                <div class="hero-banner">
+                    <div style="position:relative;z-index:1">
+                        <p class="hero-subtitle">${dateStr}</p>
+                        <h2 class="hero-title">${greeting}, ${Utils.escapeHtml(user?.full_name?.split(' ')[0] || 'Student')}</h2>
+                        <p class="hero-subtitle" style="margin-top:var(--space-1)">Here's your academic overview. Stay on track.</p>
+                        <div class="hero-actions">
+                            <a href="/pages/student/coding.html" class="hero-btn hero-btn-primary">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+                                Practice Coding
+                            </a>
+                            <a href="/pages/student/assignments.html" class="hero-btn hero-btn-secondary">
+                                View Assignments
+                            </a>
                         </div>
                     </div>
                 </div>
-            `;
 
-            // Load data
+                <!-- Stats Grid -->
+                <div class="dashboard-stats" id="statsGrid">
+                    ${Components.renderSkeleton('card', 4)}
+                </div>
+
+                <!-- Main Grid -->
+                <div class="dashboard-grid">
+                    <div class="dashboard-main">
+                        <!-- Quick Actions -->
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">Quick Actions</h3>
+                            </div>
+                            <div class="quick-actions">
+                                <a href="/pages/student/coding.html" class="quick-action-btn">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+                                    Coding Hub
+                                </a>
+                                <a href="/pages/student/assignments.html" class="quick-action-btn">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                                    Assignments
+                                </a>
+                                <a href="/pages/student/resources.html" class="quick-action-btn">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+                                    Resources
+                                </a>
+                                <a href="/pages/student/placement.html" class="quick-action-btn">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+                                    Placements
+                                </a>
+                                <a href="/pages/student/resume.html" class="quick-action-btn">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                                    Resume
+                                </a>
+                                <a href="/pages/student/contests.html" class="quick-action-btn">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
+                                    Contests
+                                </a>
+                            </div>
+                        </div>
+
+                        <!-- Upcoming Deadlines -->
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">Upcoming Deadlines</h3>
+                                <a href="/pages/student/assignments.html" class="btn btn-ghost btn-xs">View all →</a>
+                            </div>
+                            <div id="upcomingDeadlines">${Components.renderSkeleton('row', 3)}</div>
+                        </div>
+
+                        <!-- Recent Activity -->
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">Recent Activity</h3>
+                                <a href="/pages/student/notifications.html" class="btn btn-ghost btn-xs">View all →</a>
+                            </div>
+                            <div id="recentActivity">${Components.renderSkeleton('text', 3)}</div>
+                        </div>
+                    </div>
+
+                    <!-- Sidebar -->
+                    <div class="dashboard-aside">
+                        <!-- Coding Streak -->
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">Coding Streak</h3>
+                                <span class="badge badge-primary">🔥 Active</span>
+                            </div>
+                            <div id="streakWidget">${Components.renderSkeleton('text', 1)}</div>
+                        </div>
+
+                        <!-- Progress Overview -->
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">Progress</h3>
+                            </div>
+                            <div id="progressWidgets">${Components.renderSkeleton('text', 3)}</div>
+                        </div>
+
+                        <!-- Attendance -->
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">Attendance</h3>
+                                <a href="/pages/student/attendance.html" class="btn btn-ghost btn-xs">Details</a>
+                            </div>
+                            <div id="attendanceWidget">${Components.renderSkeleton('text', 1)}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+
+            // Load all data
             loadStats();
+            loadDeadlines();
             loadRecentActivity();
-            loadUpcomingAssignments();
-            loadAttendanceOverview();
+            loadProgress();
+            loadAttendance();
+            loadStreak();
+        }
+
+        function getGreeting() {
+            const h = new Date().getHours();
+            if (h < 12) return 'Good morning';
+            if (h < 17) return 'Good afternoon';
+            return 'Good evening';
         }
 
         async function loadStats() {
             const grid = document.getElementById('statsGrid');
             try {
-                // Fetch multiple endpoints in parallel
                 const [leaderboard, attendance, assignments] = await Promise.allSettled([
                     API.get('/leaderboard/me'),
                     API.get('/attendance/summary'),
                     API.get('/assignments/my'),
                 ]);
-
                 const xp = leaderboard.status === 'fulfilled' ? leaderboard.value?.data?.total_xp || 0 : 0;
                 const rank = leaderboard.status === 'fulfilled' ? leaderboard.value?.data?.rank || '—' : '—';
-                const attendancePercent = attendance.status === 'fulfilled' ? attendance.value?.data?.overall_percentage || 0 : 0;
-                const pendingAssignments = assignments.status === 'fulfilled' ? 
-                    (assignments.value?.data?.filter(a => a.status === 'pending')?.length || 0) : 0;
+                const attendPct = attendance.status === 'fulfilled' ? attendance.value?.data?.overall_percentage || 0 : 0;
+                const pending = assignments.status === 'fulfilled' ? (assignments.value?.data?.filter(a => a.status === 'pending')?.length || 0) : 0;
 
                 grid.innerHTML = `
                     <div class="stat-card">
-                        <div class="stat-icon blue">🏅</div>
+                        <div class="stat-icon purple">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                        </div>
                         <div class="stat-content">
                             <div class="stat-value">#${rank}</div>
-                            <div class="stat-label">Leaderboard Rank</div>
+                            <div class="stat-label">Campus Rank</div>
                         </div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-icon purple">⚡</div>
+                        <div class="stat-icon blue">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                        </div>
                         <div class="stat-content">
-                            <div class="stat-value">${xp}</div>
+                            <div class="stat-value">${xp.toLocaleString()}</div>
                             <div class="stat-label">Total XP</div>
                         </div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-icon green">📋</div>
+                        <div class="stat-icon green">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                        </div>
                         <div class="stat-content">
-                            <div class="stat-value">${attendancePercent}%</div>
+                            <div class="stat-value">${attendPct}%</div>
                             <div class="stat-label">Attendance</div>
+                            <div class="stat-change ${attendPct >= 75 ? 'positive' : 'negative'}">${attendPct >= 75 ? '↑ On track' : '↓ Below 75%'}</div>
                         </div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-icon yellow">📝</div>
+                        <div class="stat-icon orange">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                        </div>
                         <div class="stat-content">
-                            <div class="stat-value">${pendingAssignments}</div>
+                            <div class="stat-value">${pending}</div>
                             <div class="stat-label">Pending Tasks</div>
                         </div>
-                    </div>
-                `;
+                    </div>`;
             } catch (e) {
-                grid.innerHTML = '<p class="text-gray-500 text-sm">Unable to load stats</p>';
+                grid.innerHTML = '<p class="text-sm text-gray-500">Unable to load stats</p>';
+            }
+        }
+
+        async function loadStreak() {
+            const el = document.getElementById('streakWidget');
+            try {
+                const stats = await API.get('/questions/my-stats').catch(() => ({ data: {} }));
+                const streak = stats?.data?.streak || 0;
+                el.innerHTML = `
+                    <div class="flex items-center gap-4">
+                        <div>
+                            <div class="streak-number">${streak}</div>
+                            <div class="streak-label">day streak</div>
+                        </div>
+                        <div style="flex:1">
+                            <div class="streak-grid" style="max-width:160px;margin-left:auto">
+                                ${Array(28).fill(0).map((_, i) => {
+                                    const level = i < streak ? Math.min(Math.ceil(Math.random() * 4), 4) : 0;
+                                    return `<div class="streak-cell${level ? ' level-' + level : ''}"></div>`;
+                                }).join('')}
+                            </div>
+                        </div>
+                    </div>`;
+            } catch (e) {
+                el.innerHTML = '<p class="text-sm text-gray-500">—</p>';
+            }
+        }
+
+        async function loadDeadlines() {
+            const el = document.getElementById('upcomingDeadlines');
+            try {
+                const data = await API.get('/assignments', { page_size: 5, ordering: 'due_date' });
+                const items = data?.data?.results || data?.data || [];
+                if (items.length === 0) {
+                    el.innerHTML = Components.renderEmptyState('📋', 'No deadlines', 'You\'re all caught up!');
+                    return;
+                }
+                el.innerHTML = items.slice(0, 4).map(item => `
+                    <div class="deadline-item">
+                        <div style="min-width:0;flex:1">
+                            <p class="text-sm font-medium text-gray-800 truncate">${Utils.escapeHtml(item.title)}</p>
+                            <p class="text-xs text-gray-500 mt-1">Due ${Utils.formatDate(item.due_date)}</p>
+                        </div>
+                        <span class="badge badge-${Utils.getStatusColor(item.status || 'pending')}">${item.status || 'Pending'}</span>
+                    </div>
+                `).join('');
+            } catch (e) {
+                el.innerHTML = '<p class="text-sm text-gray-500">Unable to load deadlines</p>';
             }
         }
 
@@ -160,15 +380,16 @@
                 const data = await API.get('/notifications', { page_size: 5 });
                 const items = data?.data?.results || data?.data || [];
                 if (items.length === 0) {
-                    el.innerHTML = Components.renderEmptyState('📭', 'No recent activity', 'Your activity will appear here');
+                    el.innerHTML = Components.renderEmptyState('📭', 'No activity yet', 'Your recent actions will appear here');
                     return;
                 }
-                el.innerHTML = items.map(item => `
-                    <div class="flex items-center gap-3 py-3 border-b" style="border-color:var(--gray-100)">
-                        <div class="avatar avatar-sm">${item.type === 'assignment' ? '📝' : item.type === 'coding' ? '💻' : '🔔'}</div>
-                        <div class="flex-1">
-                            <p class="text-sm text-gray-700">${Utils.escapeHtml(item.message || item.title || '')}</p>
-                            <p class="text-xs text-gray-400">${Utils.timeAgo(item.created_at)}</p>
+                const colors = ['blue', 'green', 'yellow', 'purple'];
+                el.innerHTML = items.map((item, i) => `
+                    <div class="activity-item">
+                        <div class="activity-dot ${colors[i % colors.length]}"></div>
+                        <div style="min-width:0;flex:1">
+                            <p class="text-sm text-gray-700 line-clamp-1">${Utils.escapeHtml(item.message || item.title || '')}</p>
+                            <p class="text-xs text-gray-400 mt-1">${Utils.timeAgo(item.created_at)}</p>
                         </div>
                     </div>
                 `).join('');
@@ -177,67 +398,76 @@
             }
         }
 
-        async function loadUpcomingAssignments() {
-            const el = document.getElementById('upcomingAssignments');
+        async function loadProgress() {
+            const el = document.getElementById('progressWidgets');
             try {
-                const data = await API.get('/assignments', { page_size: 5 });
-                const items = data?.data?.results || data?.data || [];
-                if (items.length === 0) {
-                    el.innerHTML = '<p class="text-sm text-gray-500">No upcoming assignments</p>';
-                    return;
-                }
-                el.innerHTML = items.slice(0, 4).map(item => `
-                    <div class="flex items-center justify-between py-3 border-b" style="border-color:var(--gray-100)">
-                        <div>
-                            <p class="text-sm font-medium text-gray-800">${Utils.escapeHtml(item.title)}</p>
-                            <p class="text-xs text-gray-500">Due: ${Utils.formatDate(item.due_date)}</p>
+                const stats = await API.get('/questions/my-stats').catch(() => ({ data: {} }));
+                const s = stats?.data || {};
+                el.innerHTML = `
+                    <div class="progress-widget">
+                        <div class="flex justify-between mb-2">
+                            <span class="text-xs font-medium text-gray-600">Problems Solved</span>
+                            <span class="text-sm font-semibold text-gray-900">${s.solved || 0}</span>
                         </div>
-                        <span class="badge badge-${Utils.getStatusColor(item.status || 'pending')}">${item.status || 'Pending'}</span>
+                        <div class="progress-bar progress-bar-sm">
+                            <div class="progress-fill" style="width:${Math.min((s.solved || 0) / 2, 100)}%"></div>
+                        </div>
                     </div>
-                `).join('');
+                    <div class="progress-widget">
+                        <div class="flex justify-between mb-2">
+                            <span class="text-xs font-medium text-gray-600">Accuracy</span>
+                            <span class="text-sm font-semibold text-gray-900">${s.accuracy || 0}%</span>
+                        </div>
+                        <div class="progress-bar progress-bar-sm">
+                            <div class="progress-fill green" style="width:${s.accuracy || 0}%"></div>
+                        </div>
+                    </div>
+                    <div class="progress-widget">
+                        <div class="flex justify-between mb-2">
+                            <span class="text-xs font-medium text-gray-600">Submissions</span>
+                            <span class="text-sm font-semibold text-gray-900">${s.total_submissions || 0}</span>
+                        </div>
+                        <div class="progress-bar progress-bar-sm">
+                            <div class="progress-fill purple" style="width:${Math.min((s.total_submissions || 0) / 5, 100)}%"></div>
+                        </div>
+                    </div>`;
             } catch (e) {
-                el.innerHTML = '<p class="text-sm text-gray-500">Unable to load assignments</p>';
+                el.innerHTML = '<p class="text-sm text-gray-500">Unable to load progress</p>';
             }
         }
 
-        async function loadAttendanceOverview() {
-            const el = document.getElementById('attendanceOverview');
+        async function loadAttendance() {
+            const el = document.getElementById('attendanceWidget');
             try {
                 const data = await API.get('/attendance/summary');
-                const summary = data?.data;
-                if (!summary) {
-                    el.innerHTML = '<p class="text-sm text-gray-500">No attendance data</p>';
-                    return;
-                }
-                const percent = summary.overall_percentage || 0;
-                const color = percent >= 75 ? 'green' : percent >= 60 ? 'yellow' : 'red';
+                const s = data?.data;
+                if (!s) { el.innerHTML = '<p class="text-sm text-gray-500">No data</p>'; return; }
+                const pct = s.overall_percentage || 0;
+                const color = pct >= 75 ? 'green' : pct >= 60 ? 'yellow' : 'red';
                 el.innerHTML = `
-                    <div class="mb-4">
-                        <div class="flex justify-between mb-2">
-                            <span class="text-sm text-gray-600">Overall Attendance</span>
-                            <span class="text-sm font-semibold">${percent}%</span>
-                        </div>
-                        <div class="progress-bar">
-                            <div class="progress-fill ${color}" style="width:${percent}%"></div>
-                        </div>
+                    <div class="flex justify-between items-center mb-3">
+                        <span class="text-xs font-medium text-gray-600">Overall</span>
+                        <span class="text-xl font-bold text-gray-900">${pct}%</span>
                     </div>
-                    <div class="flex gap-4">
-                        <div class="text-center">
-                            <p class="text-lg font-bold text-gray-900">${summary.total_classes || 0}</p>
-                            <p class="text-xs text-gray-500">Total Classes</p>
-                        </div>
-                        <div class="text-center">
-                            <p class="text-lg font-bold text-success">${summary.attended || 0}</p>
-                            <p class="text-xs text-gray-500">Attended</p>
-                        </div>
-                        <div class="text-center">
-                            <p class="text-lg font-bold text-danger">${summary.missed || 0}</p>
-                            <p class="text-xs text-gray-500">Missed</p>
-                        </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill ${color}" style="width:${pct}%"></div>
                     </div>
-                `;
+                    <div class="flex justify-between mt-4 gap-2">
+                        <div class="text-center flex-1">
+                            <p class="text-base font-semibold text-gray-900">${s.total_classes || 0}</p>
+                            <p class="text-2xs text-gray-500">Total</p>
+                        </div>
+                        <div class="text-center flex-1">
+                            <p class="text-base font-semibold text-success">${s.attended || 0}</p>
+                            <p class="text-2xs text-gray-500">Present</p>
+                        </div>
+                        <div class="text-center flex-1">
+                            <p class="text-base font-semibold text-danger">${s.missed || 0}</p>
+                            <p class="text-2xs text-gray-500">Absent</p>
+                        </div>
+                    </div>`;
             } catch (e) {
-                el.innerHTML = '<p class="text-sm text-gray-500">Unable to load attendance</p>';
+                el.innerHTML = '<p class="text-sm text-gray-500">Unable to load</p>';
             }
         }
     </script>

@@ -10,7 +10,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from campushub.permissions import IsAdmin
-from .models import Note, NoteBookmark, NoteRating, NoteVote
+from .models import Note, NoteBookmark, NoteRating, NoteVote, NoteComment, NoteShare, NoteReport
 from .serializers import NoteSerializer, NoteUploadSerializer
 
 logger = logging.getLogger(__name__)
@@ -220,6 +220,154 @@ class NoteViewSet(viewsets.ModelViewSet):
             },
             "Rating saved.",
         )
+
+    # ── Comments ──────────────────────────────────────────────────────────────
+
+    @action(detail=True, methods=["get"], url_path="comments")
+    def comments(self, request, pk=None):
+        note = self.get_object()
+        if note.status != "approved" or not note.is_active:
+            return _err("Not found.", status.HTTP_404_NOT_FOUND)
+        comments = NoteComment.objects.filter(note=note, is_deleted=False).select_related("user")
+        data = [
+            {
+                "id": str(c.id),
+                "user_id": str(c.user.id),
+                "user_name": c.user.full_name,
+                "content": c.content,
+                "parent_id": str(c.parent_id) if c.parent_id else None,
+                "created_at": c.created_at.isoformat(),
+            }
+            for c in comments
+        ]
+        return _ok(data)
+
+    @action(detail=True, methods=["post"], url_path="comments")
+    def add_comment(self, request, pk=None):
+        note = self.get_object()
+        if note.status != "approved" or not note.is_active:
+            return _err("Not found.", status.HTTP_404_NOT_FOUND)
+        content = request.data.get("content", "").strip()
+        if not content:
+            return _err("Comment content is required.")
+        parent_id = request.data.get("parent_id")
+        comment = NoteComment.objects.create(
+            note=note, user=request.user, content=content,
+            parent_id=parent_id if parent_id else None,
+        )
+        return _ok({
+            "id": str(comment.id),
+            "user_id": str(request.user.id),
+            "user_name": request.user.full_name,
+            "content": comment.content,
+            "parent_id": str(comment.parent_id) if comment.parent_id else None,
+            "created_at": comment.created_at.isoformat(),
+        }, "Comment added.", status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=["delete"], url_path="comments/(?P<comment_id>[^/.]+)")
+    def delete_comment(self, request, pk=None, comment_id=None):
+        note = self.get_object()
+        comment = NoteComment.objects.filter(
+            id=comment_id, note=note
+        ).first()
+        if not comment:
+            return _err("Comment not found.", status.HTTP_404_NOT_FOUND)
+        # Only comment author or admin can delete
+        if comment.user != request.user and request.user.role not in ("admin", "super_admin"):
+            return _err("Permission denied.", status.HTTP_403_FORBIDDEN)
+        comment.is_deleted = True
+        comment.content = "[deleted]"
+        comment.save(update_fields=["is_deleted", "content"])
+        return _ok(message="Comment deleted.")
+
+    # ── Sharing ───────────────────────────────────────────────────────────────
+
+    @action(detail=True, methods=["post"], url_path="share")
+    def share(self, request, pk=None):
+        note = self.get_object()
+        if note.status != "approved" or not note.is_active:
+            return _err("Not found.", status.HTTP_404_NOT_FOUND)
+        share_type = request.data.get("share_type", "public")
+        shared_with_id = request.data.get("shared_with_id")
+        message = request.data.get("message", "")
+
+        shared_with = None
+        if share_type == "private" and shared_with_id:
+            from django.contrib.auth import get_user_model
+            User = get_user_model()
+            shared_with = User.objects.filter(id=shared_with_id).first()
+            if not shared_with:
+                return _err("User not found.")
+
+        share_obj = NoteShare.objects.create(
+            note=note, shared_by=request.user,
+            shared_with=shared_with, share_type=share_type,
+            message=message,
+        )
+
+        # Send notification to recipient
+        if shared_with:
+            try:
+                from apps.notifications.services import create_user_notification
+                create_user_notification(
+                    shared_with, "new_resource",
+                    f"Note shared: {note.title}",
+                    f"{request.user.full_name} shared a note with you",
+                    metadata={"note_id": str(note.id), "share_id": str(share_obj.id)},
+                )
+            except Exception:
+                pass
+
+        return _ok({
+            "share_link": share_obj.share_link,
+            "share_type": share_obj.share_type,
+        }, "Note shared.")
+
+    @action(detail=False, methods=["get"], url_path="shared-with-me")
+    def shared_with_me(self, request):
+        shares = NoteShare.objects.filter(
+            shared_with=request.user
+        ).select_related("note", "shared_by").order_by("-created_at")[:50]
+        data = [
+            {
+                "id": str(s.id),
+                "note_id": str(s.note.id),
+                "note_title": s.note.title,
+                "note_subject": s.note.subject,
+                "shared_by_name": s.shared_by.full_name,
+                "message": s.message,
+                "share_link": s.share_link,
+                "created_at": s.created_at.isoformat(),
+            }
+            for s in shares
+        ]
+        return _ok(data)
+
+    # ── Report ────────────────────────────────────────────────────────────────
+
+    @action(detail=True, methods=["post"], url_path="report")
+    def report_note(self, request, pk=None):
+        note = self.get_object()
+        reason = request.data.get("reason", "other")
+        description = request.data.get("description", "")
+        if NoteReport.objects.filter(note=note, reporter=request.user).exists():
+            return _err("You have already reported this note.")
+        NoteReport.objects.create(
+            note=note, reporter=request.user,
+            reason=reason, description=description,
+        )
+        return _ok(message="Report submitted. Our team will review it.")
+
+    # ── Delete own note ───────────────────────────────────────────────────────
+
+    @action(detail=True, methods=["delete"])
+    def destroy(self, request, pk=None):
+        note = self.get_object()
+        if note.uploaded_by != request.user and request.user.role not in ("admin", "super_admin"):
+            return _err("Permission denied.", status.HTTP_403_FORBIDDEN)
+        note.is_active = False
+        note.save(update_fields=["is_active"])
+        return _ok(message="Note deleted.")
 
 
 class AdminNoteViewSet(viewsets.GenericViewSet):

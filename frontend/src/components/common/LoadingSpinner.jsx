@@ -1,34 +1,23 @@
-const sizes = {
-  xs: "h-3 w-3 border-[1.5px]",
-  sm: "h-4 w-4 border-2",
-  md: "h-8 w-8 border-[3px]",
-  lg: "h-12 w-12 border-4",
-  xl: "h-16 w-16 border-4",
-};
-
-export default function LoadingSpinner({ size = "md", className = "", label = "Loading" }) {
+export default function LoadingSpinner({ size = "md" }) {
+  const sizes = { sm: "w-4 h-4", md: "w-6 h-6", lg: "w-8 h-8" };
   return (
-    <div className={`flex items-center justify-center ${className}`} role="status" aria-label={label}>
-      <div
-        className={`${sizes[size]} animate-spin rounded-full border-surface-200 border-t-primary-600`}
-        aria-hidden="true"
-      />
-      <span className="sr-only">{label}</span>
-    </div>
+    <svg className={`animate-spin ${sizes[size]} text-primary-600`} viewBox="0 0 24 24" fill="none">
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+    </svg>
   );
 }
 
-/**
- * Full-page loading screen used during app initialization.
- */
 export function PageLoader() {
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-surface-50 gap-4">
-      <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary-600 to-accent-violet flex items-center justify-center shadow-lg animate-pulse-soft">
-        <span className="text-white font-bold text-xl">C</span>
+    <div className="min-h-screen flex items-center justify-center bg-surface-50">
+      <div className="flex flex-col items-center gap-3">
+        <svg className="animate-spin w-8 h-8 text-primary-600" viewBox="0 0 24 24" fill="none">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+        </svg>
+        <p className="text-sm text-surface-400">Loading...</p>
       </div>
-      <LoadingSpinner size="md" />
-      <p className="text-sm text-slate-400 font-medium">Loading CampusHub...</p>
     </div>
   );
 }

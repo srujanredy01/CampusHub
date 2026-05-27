@@ -9,6 +9,60 @@
     <link rel="stylesheet" href="/assets/css/components.css">
     <link rel="stylesheet" href="/assets/css/utilities.css">
     <link rel="stylesheet" href="/assets/css/layout.css">
+    <link rel="stylesheet" href="/assets/css/sidebar.css">
+    <style>
+        .assignment-card {
+            background: var(--surface-card);
+            border: 1px solid var(--border-primary);
+            border-radius: var(--radius-xl);
+            padding: var(--space-4);
+            transition: all var(--transition-fast);
+            cursor: pointer;
+        }
+        .assignment-card:hover {
+            border-color: var(--gray-300);
+            box-shadow: var(--shadow-sm);
+        }
+        .assignment-card.urgent {
+            border-left: 3px solid var(--danger-500);
+        }
+        .assignment-card.due-soon {
+            border-left: 3px solid var(--warning-500);
+        }
+        .assignment-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: var(--space-2);
+        }
+        .assignment-title {
+            font-size: var(--text-sm);
+            font-weight: var(--font-semibold);
+            color: var(--gray-900);
+        }
+        .assignment-subject {
+            font-size: var(--text-xs);
+            color: var(--gray-500);
+            margin-top: var(--space-0-5);
+        }
+        .assignment-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: var(--space-3);
+            padding-top: var(--space-3);
+            border-top: 1px solid var(--border-secondary);
+        }
+        .due-date {
+            display: flex;
+            align-items: center;
+            gap: var(--space-1);
+            font-size: var(--text-xs);
+            color: var(--gray-500);
+        }
+        .due-date.overdue { color: var(--danger-600); }
+        .due-date.soon { color: var(--warning-600); }
+    </style>
 </head>
 <body>
     <div class="app-layout" id="app"></div>
@@ -16,67 +70,88 @@
     <script src="/assets/js/api.js"></script>
     <script src="/assets/js/auth.js"></script>
     <script src="/assets/js/utils.js"></script>
+    <script src="/assets/js/sidebar.js"></script>
     <script src="/assets/js/components.js"></script>
     <script>
         if (!Auth.requireAuth()) throw new Error('Not authenticated');
         Components.initLayout('assignments', 'Assignments');
-        loadAssignments();
 
-        let activeTab = 'all';
+        let currentTab = 'all';
+        loadAssignments();
 
         async function loadAssignments() {
             const content = document.getElementById('pageContent');
             content.innerHTML = `
             <div class="animate-fade-in">
-                <div class="tabs mb-6">
-                    <button class="tab active" onclick="switchTab('all', this)">All</button>
-                    <button class="tab" onclick="switchTab('pending', this)">Pending</button>
-                    <button class="tab" onclick="switchTab('submitted', this)">Submitted</button>
-                    <button class="tab" onclick="switchTab('graded', this)">Graded</button>
+                <div class="page-header-row mb-5">
+                    <div>
+                        <h2 class="page-title">Assignments</h2>
+                        <p class="page-subtitle">Track and submit your coursework</p>
+                    </div>
                 </div>
-                <div id="assignmentsList">
-                    ${Components.renderSkeleton('text', 4)}
+
+                <!-- Tabs -->
+                <div class="tabs mb-5">
+                    <button class="tab active" onclick="filterAssignments('all', this)">All</button>
+                    <button class="tab" onclick="filterAssignments('pending', this)">Pending</button>
+                    <button class="tab" onclick="filterAssignments('submitted', this)">Submitted</button>
+                    <button class="tab" onclick="filterAssignments('graded', this)">Graded</button>
+                </div>
+
+                <!-- Assignment Grid -->
+                <div class="grid grid-cols-2 gap-4" id="assignmentGrid">
+                    ${Components.renderSkeleton('card', 4)}
                 </div>
             </div>`;
+
             fetchAssignments();
         }
 
         async function fetchAssignments() {
-            const el = document.getElementById('assignmentsList');
+            const grid = document.getElementById('assignmentGrid');
             try {
-                const data = await API.get('/assignments');
-                let items = data?.data?.results || data?.data || [];
-
-                if (activeTab !== 'all') {
-                    items = items.filter(a => (a.status || 'pending').toLowerCase() === activeTab);
-                }
+                const params = { page_size: 20 };
+                if (currentTab !== 'all') params.status = currentTab;
+                const data = await API.get('/assignments', params);
+                const items = data?.data?.results || data?.data || [];
 
                 if (items.length === 0) {
-                    el.innerHTML = Components.renderEmptyState('📝', 'No assignments', 'No assignments in this category');
+                    grid.innerHTML = `<div class="col-span-full">${Components.renderEmptyState('📝', 'No assignments', 'You\'re all caught up!')}</div>`;
                     return;
                 }
 
-                el.innerHTML = items.map(a => `
-                    <div class="card mb-4 cursor-pointer" onclick="window.location.href='/pages/student/assignment-detail.html?id=${a.id}'">
-                        <div class="flex items-center justify-between">
+                grid.innerHTML = items.map(a => {
+                    const dueDate = new Date(a.due_date);
+                    const now = new Date();
+                    const daysLeft = Math.ceil((dueDate - now) / (1000 * 60 * 60 * 24));
+                    const urgency = daysLeft < 0 ? 'urgent' : daysLeft <= 2 ? 'due-soon' : '';
+                    const dueClass = daysLeft < 0 ? 'overdue' : daysLeft <= 2 ? 'soon' : '';
+
+                    return `
+                    <div class="assignment-card ${urgency}" onclick="window.location.href='/pages/student/assignment-detail.html?id=${a.id}'">
+                        <div class="assignment-header">
                             <div>
-                                <h4 class="font-semibold text-gray-900">${Utils.escapeHtml(a.title)}</h4>
-                                <p class="text-sm text-gray-500 mt-1">${Utils.escapeHtml(a.subject || '')} • Due: ${Utils.formatDate(a.due_date)}</p>
+                                <div class="assignment-title">${Utils.escapeHtml(a.title)}</div>
+                                <div class="assignment-subject">${Utils.escapeHtml(a.subject || a.course || '')}</div>
                             </div>
-                            <div class="flex items-center gap-3">
-                                <span class="badge badge-${Utils.getStatusColor(a.status || 'pending')}">${a.status || 'Pending'}</span>
-                                ${a.grade ? `<span class="text-sm font-semibold">${a.grade}/${a.max_grade || 100}</span>` : ''}
-                            </div>
+                            <span class="badge badge-${Utils.getStatusColor(a.status || 'pending')}">${a.status || 'Pending'}</span>
                         </div>
-                    </div>
-                `).join('');
+                        <div class="assignment-footer">
+                            <div class="due-date ${dueClass}">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                                ${daysLeft < 0 ? 'Overdue' : daysLeft === 0 ? 'Due today' : daysLeft === 1 ? 'Due tomorrow' : `Due in ${daysLeft} days`}
+                            </div>
+                            ${a.marks ? `<span class="text-xs font-medium text-gray-700">${a.marks}/${a.total_marks || 100}</span>` : ''}
+                        </div>
+                    </div>`;
+                }).join('');
             } catch (e) {
-                el.innerHTML = `<p class="text-danger">Failed to load: ${e.message}</p>`;
+                grid.innerHTML = `<p class="text-sm text-danger col-span-full">Failed to load: ${e.message}</p>`;
             }
         }
 
-        function switchTab(tab, btn) {
-            activeTab = tab;
+        function filterAssignments(tab, btn) {
+            currentTab = tab;
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             btn.classList.add('active');
             fetchAssignments();
