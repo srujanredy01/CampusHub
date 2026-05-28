@@ -241,7 +241,7 @@ class AdminDashboardView(APIView):
 # ─── Student Management ────────────────────────────────────────────────────────
 
 class AdminStudentListView(generics.ListAPIView):
-    """GET /api/admin/students — list all students with search/filter."""
+    """GET /api/admin/students — list all users with search/filter."""
     permission_classes = [IsAuthenticated, IsAdmin]
     serializer_class = UserSerializer
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
@@ -251,7 +251,7 @@ class AdminStudentListView(generics.ListAPIView):
     ordering = ["-created_at"]
 
     def get_queryset(self):
-        return User.objects.filter(role="student")
+        return User.objects.exclude(role="super_admin")
 
 
 class AdminStudentDetailView(APIView):
@@ -260,7 +260,7 @@ class AdminStudentDetailView(APIView):
 
     def _get(self, pk):
         try:
-            return User.objects.get(pk=pk, role="student")
+            return User.objects.get(pk=pk)
         except User.DoesNotExist:
             return None
 
@@ -310,15 +310,19 @@ class AdminStudentDetailView(APIView):
     def delete(self, request, pk):
         user = self._get(pk)
         if not user:
-            return err("Student not found.", 404)
+            return err("User not found.", 404)
+        if user.id == request.user.id:
+            return err("You cannot delete your own account.", 400)
+        if user.role == "super_admin":
+            return err("Cannot delete a super admin account.", 403)
         email = user.email
         user.delete()
         try:
             from apps.audit.utils import log_action
-            log_action(request, "student_delete", f"Deleted student {email}", "User", str(pk))
+            log_action(request, "student_delete", f"Deleted user {email}", "User", str(pk))
         except Exception:
             pass
-        return ok(message="Student deleted.")
+        return ok(message="User deleted.")
 
 
 class AdminStudentActivateView(APIView):

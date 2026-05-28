@@ -9,12 +9,15 @@ from .views import (
     PresenceView, UpdatePresenceView, ReportMessageView,
     ModerationMuteView, ModerationBanView,
     BlockUserView, BlockedUsersListView,
+    ChannelRequestCreateView, ChannelRequestListView,
 )
 
 urlpatterns = [
     # Channels
     path("channels", ChannelListView.as_view(), name="comm-channels"),
     path("channels/create", ChannelCreateView.as_view(), name="comm-channel-create"),
+    path("channels/request", ChannelRequestCreateView.as_view(), name="comm-channel-request"),
+    path("channels/requests", ChannelRequestListView.as_view(), name="comm-channel-requests"),
     path("channels/<slug:slug>", ChannelDetailView.as_view(), name="comm-channel-detail"),
     path("channels/<slug:slug>/join", ChannelJoinView.as_view(), name="comm-channel-join"),
     path("channels/<slug:slug>/leave", ChannelLeaveView.as_view(), name="comm-channel-leave"),

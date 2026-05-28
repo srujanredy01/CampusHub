@@ -415,3 +415,59 @@ class TypingIndicator(models.Model):
             models.Index(fields=["channel", "user"]),
             models.Index(fields=["conversation", "user"]),
         ]
+
+
+class ChannelRequest(models.Model):
+    """Student request to create a new channel. Requires moderator/admin approval."""
+
+    STATUS_CHOICES = [
+        ("pending", "Pending"),
+        ("approved", "Approved"),
+        ("rejected", "Rejected"),
+        ("needs_changes", "Needs Changes"),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    requested_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="channel_requests"
+    )
+    name = models.CharField(max_length=100)
+    description = models.TextField(blank=True, default="")
+    channel_type = models.CharField(max_length=20, choices=Channel.CHANNEL_TYPE_CHOICES)
+    visibility = models.CharField(max_length=12, choices=Channel.VISIBILITY_CHOICES, default="public")
+    purpose = models.TextField(blank=True, default="", help_text="Why this channel should exist")
+    rules = models.TextField(blank=True, default="", help_text="Proposed channel rules")
+
+    # Academic targeting
+    branch = models.CharField(max_length=100, blank=True, default="")
+    semester = models.PositiveSmallIntegerField(null=True, blank=True)
+    section = models.CharField(max_length=10, blank=True, default="")
+
+    # Status
+    status = models.CharField(max_length=15, choices=STATUS_CHOICES, default="pending")
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name="reviewed_channel_requests"
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    review_notes = models.TextField(blank=True, default="")
+    rejection_reason = models.TextField(blank=True, default="")
+
+    # Result
+    created_channel = models.ForeignKey(
+        Channel, on_delete=models.SET_NULL, null=True, blank=True, related_name="request"
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "comm_channel_requests"
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["status", "-created_at"]),
+            models.Index(fields=["requested_by", "status"]),
+        ]
+
+    def __str__(self):
+        return f"Request: #{self.name} by {self.requested_by.full_name} ({self.status})"

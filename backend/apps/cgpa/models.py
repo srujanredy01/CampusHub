@@ -88,6 +88,18 @@ class AcademicProfile(models.Model):
 
         self.save()
 
+    @property
+    def improvement_percentage(self):
+        """Calculate improvement from first to latest semester."""
+        semesters = list(self.semesters.order_by("semester"))
+        if len(semesters) < 2:
+            return 0
+        first_sgpa = float(semesters[0].sgpa)
+        last_sgpa = float(semesters[-1].sgpa)
+        if first_sgpa == 0:
+            return 0
+        return round(((last_sgpa - first_sgpa) / first_sgpa) * 100, 1)
+
 
 class SemesterRecord(models.Model):
     """One row per semester per student."""
@@ -214,6 +226,116 @@ class CGPAHistory(models.Model):
 
     def __str__(self):
         return f"{self.user.full_name} — {self.action} — CGPA: {self.cgpa_at_time}"
+
+
+class AcademicTarget(models.Model):
+    """Student-set academic goals/targets."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="academic_targets"
+    )
+    target_type = models.CharField(
+        max_length=20,
+        choices=[
+            ("cgpa", "Target CGPA"),
+            ("sgpa", "Target SGPA"),
+            ("credits", "Target Credits"),
+        ],
+        default="cgpa",
+    )
+    target_value = models.DecimalField(max_digits=5, decimal_places=2)
+    target_semester = models.PositiveSmallIntegerField(null=True, blank=True)
+    deadline = models.DateField(null=True, blank=True)
+    is_achieved = models.BooleanField(default=False)
+    achieved_at = models.DateTimeField(null=True, blank=True)
+    notes = models.TextField(blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "academic_targets"
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["user", "-created_at"]),
+            models.Index(fields=["user", "is_achieved"]),
+        ]
+
+    def __str__(self):
+        return f"{self.user.full_name} — Target {self.target_type}: {self.target_value}"
+
+    def check_achievement(self):
+        """Check if target has been achieved based on current profile."""
+        from django.utils import timezone
+        profile = AcademicProfile.objects.filter(user=self.user).first()
+        if not profile:
+            return False
+
+        achieved = False
+        if self.target_type == "cgpa":
+            achieved = float(profile.current_cgpa) >= float(self.target_value)
+        elif self.target_type == "sgpa" and self.target_semester:
+            sem = SemesterRecord.objects.filter(
+                profile=profile, semester=self.target_semester
+            ).first()
+            if sem:
+                achieved = float(sem.sgpa) >= float(self.target_value)
+        elif self.target_type == "credits":
+            achieved = profile.total_credits_earned >= int(self.target_value)
+
+        if achieved and not self.is_achieved:
+            self.is_achieved = True
+            self.achieved_at = timezone.now()
+            self.save(update_fields=["is_achieved", "achieved_at"])
+        return achieved
+
+
+class GradeComponent(models.Model):
+    """Detailed grade breakdown for a subject (internals, assignments, labs, etc.)."""
+    COMPONENT_TYPES = [
+        ("internal", "Internal Exam"),
+        ("external", "External Exam"),
+        ("assignment", "Assignment"),
+        ("lab", "Lab Work"),
+        ("project", "Project"),
+        ("mid_exam", "Mid Exam"),
+        ("quiz", "Quiz"),
+        ("attendance", "Attendance"),
+        ("presentation", "Presentation"),
+        ("viva", "Viva"),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    subject_record = models.ForeignKey(
+        SubjectRecord, on_delete=models.CASCADE, related_name="components"
+    )
+    component_type = models.CharField(max_length=20, choices=COMPONENT_TYPES)
+    component_name = models.CharField(max_length=100, blank=True, default="")
+    marks_obtained = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    max_marks = models.DecimalField(max_digits=5, decimal_places=2, default=100)
+    weightage = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "grade_components"
+        ordering = ["component_type"]
+        indexes = [
+            models.Index(fields=["subject_record", "component_type"]),
+        ]
+
+    def __str__(self):
+        return f"{self.component_type}: {self.marks_obtained}/{self.max_marks}"
+
+    @property
+    def percentage(self):
+        if self.max_marks == 0:
+            return 0
+        return round((float(self.marks_obtained) / float(self.max_marks)) * 100, 2)
+
+    @property
+    def weighted_score(self):
+        if self.max_marks == 0:
+            return 0
+        return round((float(self.marks_obtained) / float(self.max_marks)) * float(self.weightage), 2)
 
 
 # ── Keep backward compatibility with old model names ──────────────────────────

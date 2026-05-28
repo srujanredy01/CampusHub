@@ -26,9 +26,15 @@ export const signup = createAsyncThunk(
       const response = await authService.signup(userData);
       return response.data;
     } catch (error) {
-      return rejectWithValue(
-        error.response?.data?.errors || error.response?.data?.error?.message || "Signup failed"
-      );
+      const data = error.response?.data;
+      // Handle throttle (429) and other structured error responses
+      if (data?.error?.message) {
+        return rejectWithValue(data.error.message);
+      }
+      if (data?.errors) {
+        return rejectWithValue(data.errors);
+      }
+      return rejectWithValue("Signup failed. Please try again.");
     }
   }
 );
@@ -88,6 +94,14 @@ const authSlice = createSlice({
       state.isAuthenticated = false;
       state.isInitialized = true;
       state.error = null;
+    },
+    /**
+     * Update user data from external source (e.g., after role change).
+     */
+    updateUser: (state, action) => {
+      if (state.user) {
+        state.user = { ...state.user, ...action.payload };
+      }
     },
   },
   extraReducers: (builder) => {
@@ -161,5 +175,5 @@ const authSlice = createSlice({
   },
 });
 
-export const { clearError, setUser, forceLogout } = authSlice.actions;
+export const { clearError, setUser, forceLogout, updateUser } = authSlice.actions;
 export default authSlice.reducer;

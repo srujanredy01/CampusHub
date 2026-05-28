@@ -72,6 +72,31 @@ class ChatConsumer(AsyncWebsocketConsumer):
         content = data.get("content", "").strip()
         if not content:
             return
+
+        # ── Auto-moderation check ────────────────────────────────────────────
+        mod_result = await self.check_auto_moderation(content)
+        if not mod_result["allowed"]:
+            # Message blocked — notify sender
+            await self.send(text_data=json.dumps({
+                "type": "message_blocked",
+                "reason": "Your message was blocked by auto-moderation.",
+                "action": mod_result["action"],
+            }))
+            # Record violation and apply escalation
+            await self.record_auto_violation(content, mod_result)
+            # Notify moderators via shadow monitor
+            await self.notify_moderators_violation(content, mod_result)
+            return
+
+        # Check if user is muted
+        is_muted = await self.check_user_muted()
+        if is_muted:
+            await self.send(text_data=json.dumps({
+                "type": "message_blocked",
+                "reason": "You are currently muted.",
+            }))
+            return
+
         msg = await self.save_message(content, data)
         if msg:
             await self.channel_layer.group_send(self.room_group, {
@@ -90,6 +115,26 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     "created_at": msg["created_at"],
                 },
             })
+
+            # Forward to shadow monitors
+            await self.channel_layer.group_send(
+                f"chat_{self.channel_slug}_monitor",
+                {
+                    "type": "chat_monitor_message",
+                    "data": {
+                        "channel_slug": self.channel_slug,
+                        "sender": self.user.full_name,
+                        "sender_id": str(self.user.id),
+                        "content": content,
+                        "message_id": str(msg["id"]),
+                        "created_at": msg["created_at"],
+                    },
+                },
+            )
+
+            # Flag if violations detected (but allowed through)
+            if mod_result.get("violations"):
+                await self.notify_moderators_violation(content, mod_result)
 
     async def handle_typing(self, data):
         await self.channel_layer.group_send(self.room_group, {
@@ -141,7 +186,55 @@ class ChatConsumer(AsyncWebsocketConsumer):
     async def message_reaction(self, event):
         await self.send(text_data=json.dumps({"type": "reaction", **event}))
 
+    async def chat_monitor_message(self, event):
+        """Forward to shadow monitor group — no-op for regular users."""
+        pass
+
     # ── Database helpers ──────────────────────────────────────────────────────
+
+    @database_sync_to_async
+    def check_auto_moderation(self, content):
+        from apps.moderation.engine import moderation_engine
+        return moderation_engine.check_message(content, self.user, channel_id=self.channel_slug, context="channel")
+
+    @database_sync_to_async
+    def check_user_muted(self):
+        from apps.moderation.engine import moderation_engine
+        return moderation_engine.is_user_muted(self.user)
+
+    @database_sync_to_async
+    def record_auto_violation(self, content, mod_result):
+        from apps.moderation.engine import moderation_engine
+        if mod_result["violations"]:
+            violation = mod_result["violations"][0]
+            escalation = moderation_engine.record_violation(
+                self.user,
+                violation.get("rule_type", "other"),
+                content,
+                channel_id=None,
+            )
+            moderation_engine.apply_escalation(self.user, escalation, reason=f"Auto-moderation: {violation.get('rule_name', 'rule violation')}")
+
+    async def notify_moderators_violation(self, content, mod_result):
+        """Notify moderators about a flagged/blocked message."""
+        try:
+            await self.channel_layer.group_send(
+                "moderators_all",
+                {
+                    "type": "toxic_message_detected",
+                    "data": {
+                        "channel_slug": self.channel_slug,
+                        "sender": self.user.full_name,
+                        "sender_id": str(self.user.id),
+                        "content": content[:200],
+                        "action": mod_result["action"],
+                        "violations": mod_result["violations"][:3],
+                        "timestamp": timezone.now().isoformat(),
+                    },
+                },
+            )
+        except Exception:
+            pass
 
     @database_sync_to_async
     def check_membership(self):

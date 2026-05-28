@@ -16,6 +16,28 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        # ── Remove old indexes and constraints before renaming ────────────────
+        migrations.RemoveIndex(
+            model_name="semestergpa",
+            name="semester_gpa_record_sem_idx",
+        ),
+        migrations.RemoveIndex(
+            model_name="semestergpa",
+            name="semester_gpa_updated_idx",
+        ),
+        migrations.RemoveIndex(
+            model_name="subjectgrade",
+            name="subject_grade_sem_idx",
+        ),
+        migrations.RemoveIndex(
+            model_name="subjectgrade",
+            name="subject_grade_grade_idx",
+        ),
+        migrations.AlterUniqueTogether(
+            name="semestergpa",
+            unique_together=set(),
+        ),
+
         # ── Rename tables to new names ────────────────────────────────────────
         migrations.RenameModel(
             old_name="CGPARecord",

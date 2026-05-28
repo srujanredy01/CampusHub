@@ -4,7 +4,7 @@ export const notesService = {
   // Notes CRUD
   getAll:      (params = {}) => api.get("/notes/", { params }),
   getById:     (id)          => api.get(`/notes/${id}`),
-  upload:      (formData)    => api.post("/notes/upload", formData, { headers: { "Content-Type": "multipart/form-data" } }),
+  upload:      (formData)    => api.post("/notes/upload", formData, { headers: { "Content-Type": "multipart/form-data" }, _skipGlobalErrorToast: true }),
   download:    (id)          => api.get(`/notes/${id}/download`, { responseType: "blob" }),
   delete:      (id)          => api.delete(`/notes/${id}`),
 

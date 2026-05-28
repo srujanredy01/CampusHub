@@ -111,8 +111,9 @@ api.interceptors.response.use(
       }
     }
 
-    // Show error toast for non-401 errors
-    if (error.response?.status >= 500) {
+    // Show error toast for non-401 errors (only for unexpected 500s)
+    // Skip if the request already has custom error handling (multipart uploads, etc.)
+    if (error.response?.status >= 500 && !error.config?._skipGlobalErrorToast) {
       toast.error("Server error. Please try again later.");
     }
 

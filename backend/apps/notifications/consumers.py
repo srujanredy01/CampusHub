@@ -117,6 +117,20 @@ class NotificationConsumer(AsyncWebsocketConsumer):
             "unread_count": await self.get_unread_count(),
         }))
 
+    async def role_changed(self, event):
+        """Handle role change notification — triggers frontend dashboard refresh."""
+        await self.send(text_data=json.dumps({
+            "type": "role_changed",
+            "data": event.get("data", {}),
+        }))
+
+    async def permissions_changed(self, event):
+        """Handle permission change notification — triggers frontend permission refresh."""
+        await self.send(text_data=json.dumps({
+            "type": "permissions_changed",
+            "data": event.get("data", {}),
+        }))
+
     # ── Database helpers ──────────────────────────────────────────────────────
 
     @database_sync_to_async

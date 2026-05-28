@@ -17,7 +17,7 @@ from campushub.permissions import IsAdmin, IsFacultyOrAdmin, IsModeratorOrAdmin
 from .models import (
     Channel, ChannelMembership, Message, MessageReaction,
     MessageReadReceipt, DirectConversation, ConversationParticipant,
-    UserPresence, BlockedUser, ModerationAction, MessageReport,
+    UserPresence, BlockedUser, ModerationAction, MessageReport, ChannelRequest,
 )
 from .serializers import (
     ChannelSerializer, ChannelCreateSerializer, ChannelMembershipSerializer,
@@ -666,4 +666,200 @@ class AdminCommStatsView(APIView):
             "pending_reports": MessageReport.objects.filter(status="pending").count(),
             "banned_users": ChannelMembership.objects.filter(is_banned=True).values("user").distinct().count(),
             "muted_users": ChannelMembership.objects.filter(is_muted=True).values("user").distinct().count(),
+            "pending_channel_requests": ChannelRequest.objects.filter(status="pending").count(),
         })
+
+
+# ─── Channel Request Views ─────────────────────────────────────────────────────
+
+class ChannelRequestCreateView(APIView):
+    """POST /api/communication/channels/request — student requests a new channel."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        from .models import ChannelRequest
+        name = request.data.get("name", "").strip()
+        if not name or len(name) < 3:
+            return err("Channel name must be at least 3 characters.")
+        if len(name) > 100:
+            return err("Channel name too long.")
+
+        # Check for duplicate pending requests
+        if ChannelRequest.objects.filter(
+            requested_by=request.user, name__iexact=name, status="pending"
+        ).exists():
+            return err("You already have a pending request for this channel name.")
+
+        channel_request = ChannelRequest.objects.create(
+            requested_by=request.user,
+            name=name,
+            description=request.data.get("description", ""),
+            channel_type=request.data.get("channel_type", "general"),
+            visibility=request.data.get("visibility", "public"),
+            purpose=request.data.get("purpose", ""),
+            rules=request.data.get("rules", ""),
+            branch=request.data.get("branch", ""),
+            semester=request.data.get("semester"),
+            section=request.data.get("section", ""),
+        )
+
+        # Notify admins
+        try:
+            from apps.notifications.services import create_admin_alert
+            create_admin_alert(
+                "system_event", "info",
+                f"Channel request: #{name}",
+                f"{request.user.full_name} requested a new channel",
+                user=request.user,
+                metadata={"request_id": str(channel_request.id)},
+            )
+        except Exception:
+            pass
+
+        return ok({
+            "id": str(channel_request.id),
+            "name": channel_request.name,
+            "status": channel_request.status,
+        }, "Channel request submitted for review.", 201)
+
+
+class ChannelRequestListView(APIView):
+    """GET /api/communication/channels/requests — user's own requests."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from .models import ChannelRequest
+        requests = ChannelRequest.objects.filter(
+            requested_by=request.user
+        ).order_by("-created_at")[:20]
+        data = [
+            {
+                "id": str(r.id),
+                "name": r.name,
+                "channel_type": r.channel_type,
+                "visibility": r.visibility,
+                "status": r.status,
+                "review_notes": r.review_notes,
+                "rejection_reason": r.rejection_reason,
+                "created_at": r.created_at.isoformat(),
+            }
+            for r in requests
+        ]
+        return ok(data)
+
+
+class AdminChannelRequestQueueView(APIView):
+    """GET /api/admin/communication/channel-requests — pending requests for review."""
+    permission_classes = [IsAuthenticated, IsModeratorOrAdmin]
+
+    def get(self, request):
+        from .models import ChannelRequest
+        status_filter = request.query_params.get("status", "pending")
+        qs = ChannelRequest.objects.select_related("requested_by")
+        if status_filter != "all":
+            qs = qs.filter(status=status_filter)
+        qs = qs.order_by("-created_at")[:50]
+        data = [
+            {
+                "id": str(r.id),
+                "name": r.name,
+                "description": r.description,
+                "channel_type": r.channel_type,
+                "visibility": r.visibility,
+                "purpose": r.purpose,
+                "rules": r.rules,
+                "branch": r.branch,
+                "semester": r.semester,
+                "section": r.section,
+                "status": r.status,
+                "requested_by_name": r.requested_by.full_name,
+                "requested_by_email": r.requested_by.email,
+                "requested_by_role": r.requested_by.role,
+                "created_at": r.created_at.isoformat(),
+            }
+            for r in qs
+        ]
+        return ok(data)
+
+
+class AdminChannelRequestReviewView(APIView):
+    """POST /api/admin/communication/channel-requests/<id>/review — approve/reject."""
+    permission_classes = [IsAuthenticated, IsModeratorOrAdmin]
+
+    def post(self, request, pk):
+        from .models import ChannelRequest
+        from django.utils.text import slugify
+
+        try:
+            channel_request = ChannelRequest.objects.get(pk=pk)
+        except ChannelRequest.DoesNotExist:
+            return err("Request not found.", 404)
+
+        action = request.data.get("action")
+        if action not in ("approve", "reject", "needs_changes"):
+            return err("Action must be 'approve', 'reject', or 'needs_changes'.")
+
+        notes = request.data.get("notes", "")
+
+        if action == "approve":
+            # Create the channel
+            base_slug = slugify(channel_request.name)[:110]
+            slug = base_slug
+            n = 1
+            while Channel.objects.filter(slug=slug).exists():
+                slug = f"{base_slug}-{n}"
+                n += 1
+
+            channel = Channel.objects.create(
+                name=channel_request.name,
+                slug=slug,
+                description=channel_request.description,
+                channel_type=channel_request.channel_type,
+                visibility=channel_request.visibility,
+                branch=channel_request.branch,
+                semester=channel_request.semester,
+                section=channel_request.section,
+                created_by=channel_request.requested_by,
+            )
+            # Add requester as owner
+            ChannelMembership.objects.create(
+                channel=channel, user=channel_request.requested_by, role="owner"
+            )
+            channel.member_count = 1
+            channel.save(update_fields=["member_count"])
+
+            channel_request.status = "approved"
+            channel_request.created_channel = channel
+            channel_request.review_notes = notes
+
+        elif action == "reject":
+            channel_request.status = "rejected"
+            channel_request.rejection_reason = notes or "Does not meet guidelines."
+            channel_request.review_notes = notes
+
+        elif action == "needs_changes":
+            channel_request.status = "needs_changes"
+            channel_request.review_notes = notes
+
+        channel_request.reviewed_by = request.user
+        channel_request.reviewed_at = timezone.now()
+        channel_request.save()
+
+        # Notify the requester
+        try:
+            from apps.notifications.services import create_user_notification
+            status_msg = {
+                "approve": f"Your channel request '#{channel_request.name}' has been approved!",
+                "reject": f"Your channel request '#{channel_request.name}' was rejected: {channel_request.rejection_reason}",
+                "needs_changes": f"Your channel request '#{channel_request.name}' needs changes: {notes}",
+            }
+            create_user_notification(
+                channel_request.requested_by, "system",
+                f"Channel Request: {channel_request.name}",
+                status_msg[action],
+                priority="high" if action == "approve" else "normal",
+            )
+        except Exception:
+            pass
+
+        return ok({"status": channel_request.status}, f"Request {action}d.")

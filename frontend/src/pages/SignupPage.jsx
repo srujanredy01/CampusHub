@@ -8,7 +8,8 @@ export default function SignupPage() {
   const navigate = useNavigate();
   const { loading, error } = useSelector((s) => s.auth);
   const [form, setForm] = useState({
-    username: "", email: "", first_name: "", last_name: "", password: "", password2: "",
+    full_name: "", student_id: "", email: "", phone: "",
+    branch: "", semester: "1", password: "", password_confirm: "",
   });
 
   const handleSubmit = async (e) => {
@@ -58,30 +59,43 @@ export default function SignupPage() {
 
           {error && (
             <div className="mb-5 p-3 bg-danger-50 border border-danger-100 rounded-lg text-sm text-danger-700">
-              {typeof error === "string" ? error : "Registration failed. Please check your details."}
+              {typeof error === "string"
+                ? error
+                : typeof error === "object"
+                  ? Object.entries(error).map(([field, messages]) => (
+                      <p key={field}>{field}: {Array.isArray(messages) ? messages.join(", ") : messages}</p>
+                    ))
+                  : "Registration failed. Please check your details."}
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="form-group">
-                <label className="input-label">First name</label>
-                <input type="text" className="input" placeholder="John" value={form.first_name} onChange={updateField("first_name")} required />
-              </div>
-              <div className="form-group">
-                <label className="input-label">Last name</label>
-                <input type="text" className="input" placeholder="Doe" value={form.last_name} onChange={updateField("last_name")} required />
-              </div>
+            <div className="form-group">
+              <label className="input-label">Full name</label>
+              <input type="text" className="input" placeholder="John Doe" value={form.full_name} onChange={updateField("full_name")} required />
             </div>
 
             <div className="form-group">
-              <label className="input-label">Username</label>
-              <input type="text" className="input" placeholder="johndoe" value={form.username} onChange={updateField("username")} required />
+              <label className="input-label">Student ID</label>
+              <input type="text" className="input" placeholder="e.g., 12308627" value={form.student_id} onChange={updateField("student_id")} required />
             </div>
 
             <div className="form-group">
               <label className="input-label">Email</label>
-              <input type="email" className="input" placeholder="john@university.edu" value={form.email} onChange={updateField("email")} required />
+              <input type="email" className="input" placeholder="john@gmail.com" value={form.email} onChange={updateField("email")} required />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="form-group">
+                <label className="input-label">Branch</label>
+                <input type="text" className="input" placeholder="e.g., CSE" value={form.branch} onChange={updateField("branch")} required />
+              </div>
+              <div className="form-group">
+                <label className="input-label">Semester</label>
+                <select className="input" value={form.semester} onChange={updateField("semester")}>
+                  {[1,2,3,4,5,6,7,8].map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
             </div>
 
             <div className="form-group">
@@ -91,7 +105,7 @@ export default function SignupPage() {
 
             <div className="form-group">
               <label className="input-label">Confirm password</label>
-              <input type="password" className="input" placeholder="Re-enter password" value={form.password2} onChange={updateField("password2")} required />
+              <input type="password" className="input" placeholder="Re-enter password" value={form.password_confirm} onChange={updateField("password_confirm")} required />
             </div>
 
             <button type="submit" disabled={loading} className="btn-primary w-full justify-center py-2.5">

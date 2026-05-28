@@ -86,6 +86,9 @@ LOCAL_APPS = [
     "apps.settings_app",
     "apps.communication",
     "apps.events",
+    "apps.faculty",
+    "apps.moderation",
+    "apps.feedback",
 ]
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 
@@ -103,6 +106,8 @@ MIDDLEWARE = [
     "django_prometheus.middleware.PrometheusAfterMiddleware",
     # Request ID — must be early so all subsequent middleware can use it
     "campushub.middleware.RequestIDMiddleware",
+    # RBAC enforcement — must be after AuthenticationMiddleware
+    "campushub.rbac_middleware.RBACEnforcementMiddleware",
     # Activity tracking — must be after AuthenticationMiddleware
     "campushub.middleware.ActivityTrackingMiddleware",
     # Extra security headers
@@ -131,38 +136,64 @@ WSGI_APPLICATION = "campushub.wsgi.application"
 ASGI_APPLICATION = "campushub.asgi.application"
 
 # ── Channel Layers (WebSocket backend) ────────────────────────────────────────
-REDIS_URL = env("REDIS_URL", default="redis://redis:6379/0")
+REDIS_URL = env("REDIS_URL", default="redis://localhost:6379/0")
 
-CHANNEL_LAYERS = {
-    "default": {
-        "BACKEND": "channels_redis.core.RedisChannelLayer",
-        "CONFIG": {
-            "hosts": [REDIS_URL],
-        },
-    },
-}
+_USE_REDIS = env.bool("USE_REDIS", default=False)
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": env("DB_NAME", default="campushub"),
-        "USER": env("DB_USER", default="campushub_user"),
-        "PASSWORD": env("DB_PASSWORD", default="campushub_pass"),
-        "HOST": env("DB_HOST", default="localhost"),
-        "PORT": env("DB_PORT", default="5432"),
-        "CONN_MAX_AGE": 60,
-    }
-}
-
-CACHES = {
-    "default": {
-        "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": env("REDIS_URL", default="redis://redis:6379/1"),
-        "OPTIONS": {
-            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+if _USE_REDIS:
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels_redis.core.RedisChannelLayer",
+            "CONFIG": {
+                "hosts": [REDIS_URL],
+            },
         },
     }
-}
+else:
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels.layers.InMemoryChannelLayer",
+        },
+    }
+
+_DB_ENGINE = env("DB_ENGINE", default="django.db.backends.postgresql")
+
+if _DB_ENGINE == "django.db.backends.sqlite3":
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / env("DB_NAME", default="db.sqlite3"),
+        }
+    }
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": env("DB_NAME", default="campushub"),
+            "USER": env("DB_USER", default="campushub_user"),
+            "PASSWORD": env("DB_PASSWORD", default="campushub_pass"),
+            "HOST": env("DB_HOST", default="localhost"),
+            "PORT": env("DB_PORT", default="5432"),
+            "CONN_MAX_AGE": 60,
+        }
+    }
+
+if _USE_REDIS:
+    CACHES = {
+        "default": {
+            "BACKEND": "django_redis.cache.RedisCache",
+            "LOCATION": env("REDIS_URL", default="redis://localhost:6379/1"),
+            "OPTIONS": {
+                "CLIENT_CLASS": "django_redis.client.DefaultClient",
+            },
+        }
+    }
+else:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        }
+    }
 
 SESSION_ENGINE = "django.contrib.sessions.backends.db"
 
@@ -224,10 +255,10 @@ REST_FRAMEWORK = {
         "rest_framework.throttling.UserRateThrottle",
     ],
     "DEFAULT_THROTTLE_RATES": {
-        "anon":        "60/minute",
+        "anon":        "120/minute",
         "user":        "300/minute",
-        "login":       "10/minute",
-        "signup":      "5/minute",
+        "login":       "15/minute",
+        "signup":      "20/minute",
         "upload":      "20/hour",
         "code_run":    "30/minute",
         "code_submit": "20/minute",

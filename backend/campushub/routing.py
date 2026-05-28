@@ -8,6 +8,10 @@ from apps.saved.consumers import SavedContentConsumer
 from apps.communication.consumers import ChatConsumer, DMConsumer
 from apps.events.consumers import EventLiveConsumer
 from apps.attendance.consumers import AttendanceConsumer
+from apps.cgpa.consumers import AcademicConsumer
+from apps.faculty.consumers import FacultyDashboardConsumer, FacultyChatConsumer
+from apps.moderation.consumers import ModerationDashboardConsumer
+from apps.feedback.consumers import FeedbackConsumer
 
 websocket_urlpatterns = [
     path("ws/notifications/", NotificationConsumer.as_asgi()),
@@ -21,4 +25,12 @@ websocket_urlpatterns = [
     path("ws/events/<uuid:event_id>/live/", EventLiveConsumer.as_asgi()),
     # Attendance real-time sync
     path("ws/attendance/", AttendanceConsumer.as_asgi()),
+    # Academic performance real-time sync
+    path("ws/academic/", AcademicConsumer.as_asgi()),
+    # Faculty & Moderation dashboards
+    path("ws/faculty/", FacultyDashboardConsumer.as_asgi()),
+    path("ws/faculty/chat/<uuid:chat_id>/", FacultyChatConsumer.as_asgi()),
+    path("ws/moderation/", ModerationDashboardConsumer.as_asgi()),
+    # Feedback real-time updates
+    path("ws/feedback/", FeedbackConsumer.as_asgi()),
 ]

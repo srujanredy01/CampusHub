@@ -99,7 +99,7 @@ class NoteViewSet(viewsets.ModelViewSet):
         return _ok(NoteSerializer(note, context={"request": request}).data)
 
     def create(self, request, *args, **kwargs):
-        serializer = NoteUploadSerializer(data=request.data)
+        serializer = NoteUploadSerializer(data=request.data, context={"request": request})
         if not serializer.is_valid():
             return _err("Validation failed.", errors=serializer.errors)
         note = serializer.save(uploaded_by=request.user)

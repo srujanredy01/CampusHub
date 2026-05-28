@@ -1,13 +1,9 @@
-import React from "react";
-import { Navigate, Outlet } from "react-router-dom";
-import { useSelector } from "react-redux";
+/**
+ * @deprecated Use PermissionRoute instead.
+ * Kept for backward compatibility — delegates to PermissionRoute.
+ */
+import PermissionRoute from "./PermissionRoute";
 
 export default function FacultyRoute() {
-  const { isAuthenticated, isInitialized, user } = useSelector((s) => s.auth);
-  if (!isInitialized) return null;
-  if (!isAuthenticated) return <Navigate to="/login" replace />;
-  // Allow faculty, admin, and super_admin roles
-  const allowedRoles = ["faculty", "admin", "super_admin"];
-  if (!allowedRoles.includes(user?.role)) return <Navigate to="/dashboard" replace />;
-  return <Outlet />;
+  return <PermissionRoute requiresAny={["manage_students", "manage_attendance", "grade_assignments"]} />;
 }

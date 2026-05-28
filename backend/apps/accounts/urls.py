@@ -6,6 +6,10 @@ from .views import (
     ResendVerificationView, MeView, CreateFacultyView,
     CreateAdminUserView, UnlockAccountView,
 )
+from .rbac_views import (
+    DashboardConfigView, PermissionSyncView,
+    RoleUpdateView, PermissionUpdateView, RoleListView,
+)
 
 urlpatterns = [
     path("signup", SignupView.as_view(), name="auth-signup"),
@@ -18,6 +22,14 @@ urlpatterns = [
     path("resend-verification", ResendVerificationView.as_view(), name="auth-resend-verification"),
     path("token/refresh", TokenRefreshView.as_view(), name="auth-token-refresh"),
     path("me", MeView.as_view(), name="auth-me"),
+
+    # ── Dynamic RBAC endpoints ────────────────────────────────────────────────
+    path("dashboard-config", DashboardConfigView.as_view(), name="auth-dashboard-config"),
+    path("permissions", PermissionSyncView.as_view(), name="auth-permissions"),
+    path("roles", RoleListView.as_view(), name="auth-roles"),
+    path("users/<uuid:pk>/role", RoleUpdateView.as_view(), name="auth-user-role-update"),
+    path("users/<uuid:pk>/permissions", PermissionUpdateView.as_view(), name="auth-user-permissions-update"),
+
     # Admin endpoints
     path("create-faculty", CreateFacultyView.as_view(), name="auth-create-faculty"),
     path("create-admin-user", CreateAdminUserView.as_view(), name="auth-create-admin-user"),

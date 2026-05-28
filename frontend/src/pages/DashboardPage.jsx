@@ -96,6 +96,7 @@ function formatRelative(dateStr) {
 // ── Main Dashboard ───────────────────────────────────────────────────────────
 export default function DashboardPage() {
   const { user } = useSelector((s) => s.auth);
+  const { role } = useSelector((s) => s.rbac);
   const { unreadCount } = useSelector((s) => s.notifications);
   const dispatch = useDispatch();
   const [stats, setStats] = useState(null);
@@ -103,7 +104,26 @@ export default function DashboardPage() {
   const [upcomingItems, setUpcomingItems] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // Redirect non-student roles to their specific dashboards
+  // This ensures /dashboard shows the right content per role
+  const effectiveRole = role || user?.role;
+
   const fetchDashboardData = useCallback(async () => {
+    // Only fetch student-specific data for students
+    if (effectiveRole && effectiveRole !== "student" && effectiveRole !== "super_admin") {
+      setStats({
+        attendance: 0,
+        totalSubjects: 0,
+        pendingAssignments: 0,
+        totalAssignments: 0,
+        placementApps: 0,
+        cgpa: "—",
+        unreadNotifications: unreadCount,
+      });
+      setLoading(false);
+      return;
+    }
+
     try {
       const results = await Promise.allSettled([
         api.get("/attendance/"),
@@ -215,7 +235,64 @@ export default function DashboardPage() {
     return "Good evening";
   };
 
-  const displayName = user?.full_name?.split(" ")[0] || user?.email?.split("@")[0] || "Student";
+  const displayName = user?.full_name?.split(" ")[0] || user?.email?.split("@")[0] || "User";
+
+  // ── Role-specific dashboard rendering ──────────────────────────────────────
+  // Faculty, Moderator, and Admin see a simplified welcome + redirect prompt
+  // Their actual dashboards are at /faculty/dashboard, /moderator/dashboard, /admin/dashboard
+  if (effectiveRole === "faculty") {
+    return (
+      <div className="page-container space-y-6">
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-600 via-emerald-700 to-emerald-900 p-6 md:p-8 text-white">
+          <div className="relative z-10">
+            <h1 className="text-2xl md:text-3xl font-display font-bold">{greeting()}, {displayName} 👋</h1>
+            <p className="mt-2 text-white/70 text-sm md:text-base">Welcome to your Faculty workspace.</p>
+            <div className="flex flex-wrap gap-2 mt-4">
+              <Link to="/faculty/dashboard" className="inline-flex items-center gap-1.5 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg text-sm font-medium transition-colors">
+                Go to Faculty Dashboard →
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (effectiveRole === "moderator") {
+    return (
+      <div className="page-container space-y-6">
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-amber-600 via-amber-700 to-amber-900 p-6 md:p-8 text-white">
+          <div className="relative z-10">
+            <h1 className="text-2xl md:text-3xl font-display font-bold">{greeting()}, {displayName} 👋</h1>
+            <p className="mt-2 text-white/70 text-sm md:text-base">Welcome to your Moderation workspace.</p>
+            <div className="flex flex-wrap gap-2 mt-4">
+              <Link to="/moderator/dashboard" className="inline-flex items-center gap-1.5 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg text-sm font-medium transition-colors">
+                Go to Moderator Dashboard →
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (effectiveRole === "admin") {
+    return (
+      <div className="page-container space-y-6">
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-violet-600 via-violet-700 to-violet-900 p-6 md:p-8 text-white">
+          <div className="relative z-10">
+            <h1 className="text-2xl md:text-3xl font-display font-bold">{greeting()}, {displayName} 👋</h1>
+            <p className="mt-2 text-white/70 text-sm md:text-base">Welcome to the Admin control panel.</p>
+            <div className="flex flex-wrap gap-2 mt-4">
+              <Link to="/admin/dashboard" className="inline-flex items-center gap-1.5 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg text-sm font-medium transition-colors">
+                Go to Admin Dashboard →
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (

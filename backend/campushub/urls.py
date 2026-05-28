@@ -68,6 +68,13 @@ urlpatterns = [
     path("api/communication/", include("apps.communication.urls")),
     path("api/events/",        include("apps.events.urls")),
 
+    # ── Faculty & Moderation Dashboards ────────────────────────────────────
+    path("api/faculty/",       include("apps.faculty.urls")),
+    path("api/moderation/",    include("apps.moderation.urls")),
+
+    # ── Feedback & Issue Reporting ─────────────────────────────────────────
+    path("api/feedback/",      include("apps.feedback.urls")),
+
     # ── Docs & Metrics ─────────────────────────────────────────────────────
     path("api/schema/",        SpectacularAPIView.as_view(),                        name="schema"),
     path("api/docs/",          SpectacularSwaggerView.as_view(url_name="schema"),   name="swagger-ui"),

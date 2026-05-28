@@ -60,6 +60,7 @@ from apps.communication.views import (
     AdminChannelListView, AdminAllMessagesView, AdminDMListView,
     AdminReportsView, AdminResolveReportView, AdminModerationLogView,
     AdminOnlineUsersView, AdminCommStatsView,
+    AdminChannelRequestQueueView, AdminChannelRequestReviewView,
 )
 from apps.events.views import (
     AdminEventListView, AdminEventDetailView, AdminEventRegistrationsView,
@@ -164,6 +165,8 @@ urlpatterns = [
     path("communication/moderation-log",               AdminModerationLogView.as_view(),         name="admin-comm-moderation-log"),
     path("communication/online-users",                 AdminOnlineUsersView.as_view(),           name="admin-comm-online-users"),
     path("communication/stats",                        AdminCommStatsView.as_view(),             name="admin-comm-stats"),
+    path("communication/channel-requests",             AdminChannelRequestQueueView.as_view(),   name="admin-comm-channel-requests"),
+    path("communication/channel-requests/<uuid:pk>/review", AdminChannelRequestReviewView.as_view(), name="admin-comm-channel-request-review"),
 
     # Events management
     path("events",                                     AdminEventListView.as_view(),             name="admin-events"),
@@ -171,4 +174,6 @@ urlpatterns = [
     path("events/certificates",                        AdminAllCertificatesView.as_view(),       name="admin-events-certificates"),
     path("events/<slug:slug>",                         AdminEventDetailView.as_view(),           name="admin-event-detail"),
     path("events/<slug:slug>/registrations",           AdminEventRegistrationsView.as_view(),    name="admin-event-registrations"),
+
+    # Faculty system visibility (admin can access via /api/faculty/admin/overview)
 ]

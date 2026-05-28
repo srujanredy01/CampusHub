@@ -5,9 +5,15 @@ from .views import (
     SemesterDetailView,
     BulkSaveSemestersView,
     GradeConverterView,
+    GradePredictorView,
     TargetPredictorView,
     CGPAAnalyticsView,
     CGPAHistoryView,
+    WeakSubjectsView,
+    AcademicTargetListCreateView,
+    AcademicTargetDetailView,
+    FacultyUploadMarksView,
+    FacultyStudentAnalyticsView,
     AdminCGPAListView,
     AdminCGPADetailView,
     AdminCGPAAnalyticsView,
@@ -22,8 +28,16 @@ urlpatterns = [
     path("bulk-save", BulkSaveSemestersView.as_view(), name="cgpa-bulk-save"),
     path("grade-convert", GradeConverterView.as_view(), name="cgpa-grade-convert"),
     path("predict-target", TargetPredictorView.as_view(), name="cgpa-predict-target"),
+    path("predict-grade", GradePredictorView.as_view(), name="cgpa-predict-grade"),
     path("analytics", CGPAAnalyticsView.as_view(), name="cgpa-analytics"),
     path("history", CGPAHistoryView.as_view(), name="cgpa-history"),
+    path("weak-subjects", WeakSubjectsView.as_view(), name="cgpa-weak-subjects"),
+    path("targets", AcademicTargetListCreateView.as_view(), name="cgpa-targets"),
+    path("targets/<uuid:pk>", AcademicTargetDetailView.as_view(), name="cgpa-target-detail"),
+
+    # Faculty endpoints
+    path("faculty/upload-marks", FacultyUploadMarksView.as_view(), name="cgpa-faculty-upload"),
+    path("faculty/analytics", FacultyStudentAnalyticsView.as_view(), name="cgpa-faculty-analytics"),
 
     # Admin endpoints
     path("admin/records", AdminCGPAListView.as_view(), name="cgpa-admin-records"),

@@ -129,7 +129,9 @@ function MessageItem({ message, isOwn, onReact }) {
 
 // ── Create Channel Modal ─────────────────────────────────────────────────────
 function CreateChannelModal({ isOpen, onClose, onCreated }) {
-  const [form, setForm] = useState({ name: "", description: "", channel_type: "general", visibility: "public" });
+  const { user } = useSelector((s) => s.auth);
+  const isAdmin = user?.role === "admin" || user?.role === "super_admin" || user?.role === "faculty";
+  const [form, setForm] = useState({ name: "", description: "", channel_type: "general", visibility: "public", purpose: "" });
   const [submitting, setSubmitting] = useState(false);
 
   if (!isOpen) return null;
@@ -139,13 +141,20 @@ function CreateChannelModal({ isOpen, onClose, onCreated }) {
     if (!form.name.trim()) { toast.error("Channel name is required"); return; }
     setSubmitting(true);
     try {
-      const res = await api.post("/communication/channels/create", form);
-      toast.success("Channel created");
-      onCreated(res.data?.data || res.data);
+      if (isAdmin) {
+        // Admin/faculty can create directly
+        const res = await api.post("/communication/channels/create", form);
+        toast.success("Channel created");
+        onCreated(res.data?.data || res.data);
+      } else {
+        // Students submit a request for approval
+        await api.post("/communication/channels/request", form);
+        toast.success("Channel request submitted! It will be reviewed by moderators.");
+      }
       onClose();
-      setForm({ name: "", description: "", channel_type: "general", visibility: "public" });
+      setForm({ name: "", description: "", channel_type: "general", visibility: "public", purpose: "" });
     } catch (err) {
-      toast.error(err?.response?.data?.error?.message || "Failed to create channel");
+      toast.error(err?.response?.data?.error?.message || "Failed to submit");
     } finally { setSubmitting(false); }
   };
 
@@ -153,7 +162,12 @@ function CreateChannelModal({ isOpen, onClose, onCreated }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-surface-900/30 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-white rounded-2xl shadow-float w-full max-w-md p-6 animate-fade-up">
-        <h3 className="text-lg font-semibold text-surface-900 mb-4">Create Channel</h3>
+        <h3 className="text-lg font-semibold text-surface-900 mb-1">
+          {isAdmin ? "Create Channel" : "Request Channel"}
+        </h3>
+        {!isAdmin && (
+          <p className="text-xs text-surface-500 mb-4">Your request will be reviewed by moderators before the channel is created.</p>
+        )}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="text-xs font-medium text-surface-600 mb-1 block">Channel Name *</label>
@@ -165,6 +179,13 @@ function CreateChannelModal({ isOpen, onClose, onCreated }) {
             <input type="text" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })}
               className="input-field" placeholder="What's this channel about?" />
           </div>
+          {!isAdmin && (
+            <div>
+              <label className="text-xs font-medium text-surface-600 mb-1 block">Purpose</label>
+              <textarea value={form.purpose} onChange={(e) => setForm({ ...form, purpose: e.target.value })}
+                className="input-field min-h-[60px] resize-none" placeholder="Why should this channel exist? Who will benefit?" />
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-medium text-surface-600 mb-1 block">Type</label>

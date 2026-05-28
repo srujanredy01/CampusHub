@@ -2,10 +2,13 @@ import { useState, useEffect, useRef } from "react";
 import { Outlet, NavLink, useNavigate, useLocation } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { logout } from "../../store/slices/authSlice";
+import { resetRbac } from "../../store/slices/rbacSlice";
 import NotificationBell from "./NotificationBell";
 import AdminAlertBell from "../admin/AdminAlertBell";
 import { useNotificationWebSocket } from "../../hooks/useNotificationWebSocket";
+import { useHasPermission } from "../../hooks/usePermissions";
 import GlobalSearch from "./GlobalSearch";
+import FeedbackButton from "../feedback/FeedbackButton";
 
 // ── Icon Components (Minimal, Linear-style) ──────────────────────────────────
 const Icons = {
@@ -167,60 +170,63 @@ const Icons = {
 };
 
 // ── Navigation Configuration ─────────────────────────────────────────────────
-const studentNav = [
+// DYNAMIC: Sidebar items now come from the RBAC slice (backend-driven).
+// The static arrays below are kept as fallback only if RBAC hasn't loaded yet.
+
+const fallbackNav = [
   { section: "Main" },
   { to: "/dashboard",      Icon: Icons.Dashboard,     label: "Dashboard" },
   { to: "/profile",        Icon: Icons.Profile,       label: "Profile" },
   { to: "/notifications",  Icon: Icons.Notifications, label: "Notifications" },
-
-  { section: "Academics" },
-  { to: "/resources",      Icon: Icons.Resources,     label: "Resources" },
-  { to: "/assignments",    Icon: Icons.Assignments,   label: "Assignments" },
-  { to: "/attendance",     Icon: Icons.Attendance,    label: "Attendance" },
-  { to: "/cgpa",           Icon: Icons.Academic,      label: "Performance" },
-  { to: "/notes",          Icon: Icons.Notes,         label: "Notes" },
-  { to: "/news",           Icon: Icons.News,          label: "Announcements" },
-
-  { section: "Coding & Career" },
-  { to: "/coding",         Icon: Icons.Code,          label: "Coding Hub" },
-  { to: "/contests",       Icon: Icons.Contest,       label: "Contests" },
-  { to: "/leaderboard",    Icon: Icons.Trophy,        label: "Leaderboard" },
-  { to: "/roadmaps",       Icon: Icons.Roadmap,       label: "Roadmaps" },
-  { to: "/resume",         Icon: Icons.Resume,        label: "Resume Builder" },
-  { to: "/placement",      Icon: Icons.Placement,     label: "Placement" },
-
-  { section: "Community" },
-  { to: "/communication",  Icon: Icons.Chat,          label: "Campus Chat" },
-  { to: "/groups",         Icon: Icons.Groups,        label: "Study Groups" },
-  { to: "/events",         Icon: Icons.Events,        label: "Events" },
-  { to: "/lost-found",     Icon: Icons.LostFound,     label: "Lost & Found" },
-
-  { section: "Personal" },
-  { to: "/saved",          Icon: Icons.Saved,         label: "Saved" },
-  { to: "/settings",       Icon: Icons.Settings,      label: "Settings" },
 ];
 
-const adminNav = [
-  { section: "Overview" },
-  { to: "/admin/dashboard",      Icon: Icons.Dashboard,     label: "Dashboard" },
-  { to: "/admin/users",          Icon: Icons.Users,         label: "Users" },
+// ── Icon Map (maps backend icon names to components) ─────────────────────────
+const IconMap = {
+  Dashboard: Icons.Dashboard,
+  Profile: Icons.Profile,
+  Resources: Icons.Resources,
+  Assignments: Icons.Assignments,
+  Attendance: Icons.Attendance,
+  Academic: Icons.Academic,
+  News: Icons.News,
+  Code: Icons.Code,
+  Trophy: Icons.Trophy,
+  Contest: Icons.Contest,
+  Roadmap: Icons.Roadmap,
+  Resume: Icons.Resume,
+  Placement: Icons.Placement,
+  Chat: Icons.Chat,
+  Groups: Icons.Groups,
+  Events: Icons.Events,
+  LostFound: Icons.LostFound,
+  Notifications: Icons.Notifications,
+  Saved: Icons.Saved,
+  Settings: Icons.Settings,
+  Notes: Icons.Notes,
+  Users: Icons.Users,
+  Analytics: Icons.Analytics,
+  Audit: Icons.Audit,
+};
 
-  { section: "Academic" },
-  { to: "/admin/resources",      Icon: Icons.Resources,     label: "Resources" },
-  { to: "/admin/notes",          Icon: Icons.Notes,         label: "Notes" },
-  { to: "/admin/news",           Icon: Icons.News,          label: "News" },
-  { to: "/admin/cgpa",           Icon: Icons.Academic,      label: "Records" },
-  { to: "/admin/attendance",     Icon: Icons.Attendance,    label: "Attendance" },
+/**
+ * Convert backend sidebar config to the format the Sidebar component expects.
+ * Backend sends: [{ section: "Main" }, { path: "/dashboard", label: "Dashboard", icon: "Dashboard" }]
+ * Component needs: [{ section: "Main" }, { to: "/dashboard", Icon: Icons.Dashboard, label: "Dashboard" }]
+ */
+function buildNavItems(sidebarConfig) {
+  if (!sidebarConfig || sidebarConfig.length === 0) return fallbackNav;
 
-  { section: "Platform" },
-  { to: "/admin/questions",      Icon: Icons.Code,          label: "Coding" },
-  { to: "/admin/communication",  Icon: Icons.Chat,          label: "Chat" },
-  { to: "/admin/events",         Icon: Icons.Events,        label: "Events" },
-  { to: "/admin/notifications",  Icon: Icons.Notifications, label: "Notifications" },
-
-  { section: "System" },
-  { to: "/admin/audit",          Icon: Icons.Audit,         label: "Audit Logs" },
-];
+  return sidebarConfig.map((item) => {
+    if (item.section) {
+      return { section: item.section };
+    }
+    return {
+      to: item.path,
+      label: item.label,
+      Icon: IconMap[item.icon] || Icons.Dashboard,
+    };
+  });
+}
 
 // ── Sidebar Component ────────────────────────────────────────────────────────
 function Sidebar({ collapsed, setCollapsed, navItems, user, onLogout, mobileOpen, setMobileOpen }) {
@@ -375,6 +381,7 @@ export default function Layout({ isAdmin = false }) {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { user } = useSelector((s) => s.auth);
+  const { sidebar: rbacSidebar, role, roleChangeNotification } = useSelector((s) => s.rbac);
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -397,13 +404,25 @@ export default function Layout({ isAdmin = false }) {
 
   const handleLogout = () => {
     dispatch(logout());
+    dispatch(resetRbac());
     navigate("/login");
   };
 
-  const navItems = isAdmin ? adminNav : studentNav;
+  // Dynamic sidebar: use RBAC config from backend, fallback to static
+  const navItems = buildNavItems(rbacSidebar);
+
+  // Show admin alert bell if user has admin permissions
+  const showAdminAlerts = useHasPermission("manage_users");
 
   return (
     <div className="min-h-screen bg-surface-50">
+      {/* Role change notification banner */}
+      {roleChangeNotification && (
+        <div className="fixed top-0 left-0 right-0 z-[100] bg-primary-600 text-white text-center py-2 px-4 text-sm animate-fade-in">
+          🔄 {roleChangeNotification.message || "Your role has been updated. Dashboard refreshed."}
+        </div>
+      )}
+
       <Sidebar
         collapsed={collapsed}
         setCollapsed={setCollapsed}
@@ -418,19 +437,23 @@ export default function Layout({ isAdmin = false }) {
         collapsed={collapsed}
         setMobileOpen={setMobileOpen}
         user={user}
-        isAdmin={isAdmin}
+        isAdmin={showAdminAlerts}
       />
 
       <main
         className={`
           pt-[var(--header-height)] min-h-screen transition-all duration-200
           ${collapsed ? "md:pl-[var(--sidebar-collapsed)]" : "md:pl-[var(--sidebar-width)]"}
+          ${roleChangeNotification ? "mt-8" : ""}
         `}
       >
         <div className="p-4 md:p-6 lg:p-8">
           <Outlet />
         </div>
       </main>
+
+      {/* Floating Feedback Button */}
+      <FeedbackButton />
     </div>
   );
 }

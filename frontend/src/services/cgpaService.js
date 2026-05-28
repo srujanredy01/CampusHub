@@ -10,8 +10,18 @@ export const cgpaService = {
   bulkSave: (data) => api.post("/cgpa/bulk-save", data),
   convertGrade: (payload) => api.post("/cgpa/grade-convert", payload),
   predictTarget: (data) => api.post("/cgpa/predict-target", data),
+  predictGrade: (data) => api.post("/cgpa/predict-grade", data),
   getAnalytics: () => api.get("/cgpa/analytics"),
   getHistory: () => api.get("/cgpa/history"),
+  getWeakSubjects: () => api.get("/cgpa/weak-subjects"),
+  getTargets: () => api.get("/cgpa/targets"),
+  createTarget: (data) => api.post("/cgpa/targets", data),
+  updateTarget: (id, data) => api.put(`/cgpa/targets/${id}`, data),
+  deleteTarget: (id) => api.delete(`/cgpa/targets/${id}`),
+
+  // Faculty endpoints
+  facultyUploadMarks: (data) => api.post("/cgpa/faculty/upload-marks", data),
+  facultyGetAnalytics: (params) => api.get("/cgpa/faculty/analytics", { params }),
 
   // Admin endpoints
   adminGetRecords: (params) => api.get("/cgpa/admin/records", { params }),

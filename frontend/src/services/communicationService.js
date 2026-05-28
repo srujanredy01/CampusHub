@@ -4,50 +4,50 @@ export const communicationService = {
   // Channels
   getChannels: (params = {}) => api.get("/communication/channels", { params }),
   getChannel: (slug) => api.get(`/communication/channels/${slug}`),
-  createChannel: (data) => api.post("/communication/channels", data),
-  updateChannel: (slug, data) => api.put(`/communication/channels/${slug}`, data),
-  deleteChannel: (slug) => api.delete(`/communication/channels/${slug}`),
+  createChannel: (data) => api.post("/communication/channels/create", data),
   joinChannel: (slug) => api.post(`/communication/channels/${slug}/join`),
   leaveChannel: (slug) => api.post(`/communication/channels/${slug}/leave`),
   getChannelMembers: (slug, params = {}) => api.get(`/communication/channels/${slug}/members`, { params }),
 
+  // Channel Requests (moderated creation)
+  requestChannel: (data) => api.post("/communication/channels/request", data),
+  getMyRequests: () => api.get("/communication/channels/requests"),
+
   // Messages
   getMessages: (slug, params = {}) => api.get(`/communication/channels/${slug}/messages`, { params }),
-  sendMessage: (slug, data) => api.post(`/communication/channels/${slug}/messages`, data),
+  sendMessage: (data) => api.post("/communication/messages", data),
   editMessage: (msgId, data) => api.put(`/communication/messages/${msgId}`, data),
-  deleteMessage: (msgId) => api.delete(`/communication/messages/${msgId}`),
+  deleteMessage: (msgId) => api.delete(`/communication/messages/${msgId}/delete`),
   pinMessage: (msgId) => api.post(`/communication/messages/${msgId}/pin`),
-  unpinMessage: (msgId) => api.post(`/communication/messages/${msgId}/unpin`),
   getPinnedMessages: (slug) => api.get(`/communication/channels/${slug}/pinned`),
+  searchMessages: (params) => api.get("/communication/messages/search", { params }),
 
   // Reactions
-  addReaction: (msgId, emoji) => api.post(`/communication/messages/${msgId}/react`, { emoji }),
-  removeReaction: (msgId, emoji) => api.delete(`/communication/messages/${msgId}/react`, { data: { emoji } }),
+  toggleReaction: (msgId, emoji) => api.post(`/communication/messages/${msgId}/react`, { emoji }),
 
   // Threads
-  getThread: (msgId, params = {}) => api.get(`/communication/messages/${msgId}/thread`, { params }),
+  getThread: (msgId) => api.get(`/communication/messages/${msgId}/thread`),
 
   // Direct Messages
   getConversations: (params = {}) => api.get("/communication/conversations", { params }),
-  getConversation: (id) => api.get(`/communication/conversations/${id}`),
-  createConversation: (data) => api.post("/communication/conversations", data),
+  createConversation: (data) => api.post("/communication/conversations/create", data),
   getConversationMessages: (id, params = {}) => api.get(`/communication/conversations/${id}/messages`, { params }),
-  sendDM: (id, data) => api.post(`/communication/conversations/${id}/messages`, data),
 
   // Presence
-  getOnlineUsers: () => api.get("/communication/online"),
-  updatePresence: (status) => api.post("/communication/presence", { status }),
-
-  // Search
-  searchMessages: (params) => api.get("/communication/search", { params }),
+  getOnlineUsers: (params = {}) => api.get("/communication/presence", { params }),
+  updatePresence: (data) => api.post("/communication/presence/update", data),
 
   // Reports
   reportMessage: (msgId, data) => api.post(`/communication/messages/${msgId}/report`, data),
 
   // Block
-  blockUser: (userId) => api.post(`/communication/block/${userId}`),
-  unblockUser: (userId) => api.delete(`/communication/block/${userId}`),
+  blockUser: (data) => api.post("/communication/block", data),
+  unblockUser: (data) => api.delete("/communication/block", { data }),
   getBlockedUsers: () => api.get("/communication/blocked"),
+
+  // Admin
+  getChannelRequests: (params = {}) => api.get("/admin/communication/channel-requests", { params }),
+  reviewChannelRequest: (id, data) => api.post(`/admin/communication/channel-requests/${id}/review`, data),
 };
 
 export default communicationService;
