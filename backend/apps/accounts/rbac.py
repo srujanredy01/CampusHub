@@ -414,13 +414,19 @@ SIDEBAR_CONFIG = [
     {"section": "Administration", "permission": "manage_users"},
     {"path": "/admin/dashboard", "label": "Admin Dashboard", "icon": "Dashboard", "permission": "manage_users"},
     {"path": "/admin/users", "label": "User Management", "icon": "Users", "permission": "manage_users"},
-    {"path": "/admin/departments", "label": "Department Management", "icon": "Groups", "permission": "manage_departments"},
-    {"path": "/admin/sections", "label": "Section Management", "icon": "Assignments", "permission": "manage_sections"},
+    {"path": "/admin/departments", "label": "Departments", "icon": "Groups", "permission": "manage_departments"},
+    {"path": "/admin/sections", "label": "Sections", "icon": "Assignments", "permission": "manage_sections"},
     {"path": "/admin/analytics", "label": "Analytics & Reports", "icon": "Analytics", "permission": "view_admin_analytics"},
     {"path": "/admin/moderation", "label": "Moderation Overview", "icon": "Audit", "permission": "admin_moderation_overview"},
-    {"path": "/admin/events", "label": "Events Management", "icon": "Events", "permission": "manage_events"},
     {"path": "/admin/academic", "label": "Academic Overview", "icon": "Academic", "permission": "admin_academic_overview"},
+    {"path": "/admin/events", "label": "Events", "icon": "Events", "permission": "manage_events"},
+    {"path": "/admin/announcements", "label": "Announcements", "icon": "News", "permission": "manage_notifications"},
+    {"path": "/admin/study-groups", "label": "Study Groups", "icon": "Groups", "permission": "manage_communication"},
+    {"path": "/admin/channels", "label": "Channels", "icon": "Chat", "permission": "manage_communication"},
+    {"path": "/admin/placement", "label": "Placement", "icon": "Placement", "permission": "view_admin_analytics"},
+    {"path": "/admin/resources", "label": "Resources", "icon": "Resources", "permission": "manage_resources"},
     {"path": "/admin/notifications", "label": "Notifications", "icon": "Notifications", "permission": "manage_notifications"},
+    {"path": "/admin/audit", "label": "Audit Logs", "icon": "Audit", "permission": "view_audit_logs"},
 
     # ══════════════════════════════════════════════════════════════════════════
     # SUPER ADMIN: System & Infrastructure

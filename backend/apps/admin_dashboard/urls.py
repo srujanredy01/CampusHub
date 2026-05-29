@@ -66,6 +66,19 @@ from apps.events.views import (
     AdminEventListView, AdminEventDetailView, AdminEventRegistrationsView,
     AdminEventStatsView, AdminAllCertificatesView,
 )
+from .admin_views import (
+    AdminDepartmentListCreateView, AdminDepartmentDetailView,
+    AdminSectionListCreateView, AdminSectionDetailView, AdminSectionMoveStudentView,
+    AdminCreateUserView,
+    AdminFacultyListView, AdminFacultyDetailView,
+    AdminModeratorListView, AdminModeratorDetailView,
+    AdminAnnouncementListCreateView, AdminAnnouncementDetailView,
+    AdminLiveAnalyticsView,
+    AdminModerationOverviewView, AdminAcademicOverviewView,
+    AdminStudyGroupOverviewView, AdminStudyGroupActionView,
+    AdminChannelOverviewView, AdminChannelActionView,
+    AdminPlacementOverviewView, AdminResourceOverviewView,
+)
 
 urlpatterns = [
     # Dashboard
@@ -176,4 +189,42 @@ urlpatterns = [
     path("events/<slug:slug>/registrations",           AdminEventRegistrationsView.as_view(),    name="admin-event-registrations"),
 
     # Faculty system visibility (admin can access via /api/faculty/admin/overview)
+
+    # ── New Admin Dashboard Views ──────────────────────────────────────────
+    # Departments
+    path("departments",                            AdminDepartmentListCreateView.as_view(),    name="admin-departments"),
+    path("departments/<uuid:pk>",                  AdminDepartmentDetailView.as_view(),        name="admin-department-detail"),
+
+    # Sections
+    path("sections",                               AdminSectionListCreateView.as_view(),       name="admin-sections"),
+    path("sections/<uuid:pk>",                     AdminSectionDetailView.as_view(),           name="admin-section-detail"),
+    path("sections/<uuid:pk>/move-student",        AdminSectionMoveStudentView.as_view(),      name="admin-section-move-student"),
+
+    # User creation
+    path("users/create",                           AdminCreateUserView.as_view(),              name="admin-user-create"),
+
+    # Faculty management
+    path("faculty",                                AdminFacultyListView.as_view(),             name="admin-faculty-list"),
+    path("faculty/<uuid:pk>",                      AdminFacultyDetailView.as_view(),           name="admin-faculty-detail"),
+
+    # Moderator management
+    path("moderators",                             AdminModeratorListView.as_view(),           name="admin-moderator-list"),
+    path("moderators/<uuid:pk>",                   AdminModeratorDetailView.as_view(),         name="admin-moderator-detail"),
+
+    # Announcements
+    path("announcements",                          AdminAnnouncementListCreateView.as_view(),  name="admin-announcements"),
+    path("announcements/<uuid:pk>",                AdminAnnouncementDetailView.as_view(),      name="admin-announcement-detail"),
+
+    # Live analytics
+    path("live-analytics",                         AdminLiveAnalyticsView.as_view(),           name="admin-live-analytics"),
+
+    # Overviews
+    path("moderation-overview",                    AdminModerationOverviewView.as_view(),      name="admin-moderation-overview"),
+    path("academic-overview",                      AdminAcademicOverviewView.as_view(),        name="admin-academic-overview"),
+    path("study-groups-overview",                  AdminStudyGroupOverviewView.as_view(),      name="admin-study-groups-overview"),
+    path("study-groups-overview/<uuid:pk>/action", AdminStudyGroupActionView.as_view(),        name="admin-study-group-action"),
+    path("channels-overview",                      AdminChannelOverviewView.as_view(),         name="admin-channels-overview"),
+    path("channels-overview/<uuid:pk>/action",     AdminChannelActionView.as_view(),           name="admin-channel-action"),
+    path("placement-overview",                     AdminPlacementOverviewView.as_view(),       name="admin-placement-overview"),
+    path("resource-overview",                      AdminResourceOverviewView.as_view(),        name="admin-resource-overview"),
 ]

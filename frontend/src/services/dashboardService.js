@@ -8,6 +8,7 @@ export const dashboardService = {
   getAdminDashboard: () => api.get("/admin/dashboard"),
   getSystemHealth: () => api.get("/admin/system/health"),
   getAnalytics: (params = {}) => api.get("/admin/analytics", { params }),
+  getLiveAnalytics: () => api.get("/admin/live-analytics"),
   getActivityLogs: (params = {}) => api.get("/admin/activity-logs", { params }),
   getActivityStats: () => api.get("/admin/activity-stats"),
   getAuditLogs: (params = {}) => api.get("/admin/logs", { params }),

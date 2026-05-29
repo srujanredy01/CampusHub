@@ -63,6 +63,15 @@ import AdminAttendancePage      from "./pages/AdminAttendancePage";
 import AdminCommunicationPage   from "./pages/AdminCommunicationPage";
 import AdminEventsPage          from "./pages/AdminEventsPage";
 import AdminFeedbackPage        from "./pages/AdminFeedbackPage";
+import AdminDepartmentsPage     from "./pages/AdminDepartmentsPage";
+import AdminSectionsPage        from "./pages/AdminSectionsPage";
+import AdminAnalyticsPage       from "./pages/AdminAnalyticsPage";
+import AdminModerationPage      from "./pages/AdminModerationPage";
+import AdminAcademicPage        from "./pages/AdminAcademicPage";
+import AdminAnnouncementsPage   from "./pages/AdminAnnouncementsPage";
+import AdminStudyGroupsPage     from "./pages/AdminStudyGroupsPage";
+import AdminChannelsPage        from "./pages/AdminChannelsPage";
+import AdminPlacementPage       from "./pages/AdminPlacementPage";
 
 // ── Faculty pages ─────────────────────────────────────────────────────────────
 import FacultyDashboardPage     from "./pages/FacultyDashboardPage";
@@ -306,6 +315,15 @@ function App() {
           <Route path="/admin"                element={<Navigate to="/admin/dashboard" replace />} />
           <Route path="/admin/dashboard"      element={<AdminDashboardPage />} />
           <Route path="/admin/users"          element={<AdminUsersPage />} />
+          <Route path="/admin/departments"    element={<AdminDepartmentsPage />} />
+          <Route path="/admin/sections"       element={<AdminSectionsPage />} />
+          <Route path="/admin/analytics"      element={<AdminAnalyticsPage />} />
+          <Route path="/admin/moderation"     element={<AdminModerationPage />} />
+          <Route path="/admin/academic"       element={<AdminAcademicPage />} />
+          <Route path="/admin/announcements"  element={<AdminAnnouncementsPage />} />
+          <Route path="/admin/study-groups"   element={<AdminStudyGroupsPage />} />
+          <Route path="/admin/channels"       element={<AdminChannelsPage />} />
+          <Route path="/admin/placement"      element={<AdminPlacementPage />} />
           <Route path="/admin/resources"      element={<AdminResourcesPage />} />
           <Route path="/admin/news"           element={<AdminNewsPage />} />
           <Route path="/admin/questions"      element={<AdminQuestionsPage />} />

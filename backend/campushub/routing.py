@@ -12,6 +12,7 @@ from apps.cgpa.consumers import AcademicConsumer
 from apps.faculty.consumers import FacultyDashboardConsumer, FacultyChatConsumer
 from apps.moderation.consumers import ModerationDashboardConsumer
 from apps.feedback.consumers import FeedbackConsumer
+from apps.admin_dashboard.consumers import AdminDashboardConsumer
 
 websocket_urlpatterns = [
     path("ws/notifications/", NotificationConsumer.as_asgi()),
@@ -33,4 +34,6 @@ websocket_urlpatterns = [
     path("ws/moderation/", ModerationDashboardConsumer.as_asgi()),
     # Feedback real-time updates
     path("ws/feedback/", FeedbackConsumer.as_asgi()),
+    # Admin Dashboard real-time updates
+    path("ws/admin/dashboard/", AdminDashboardConsumer.as_asgi()),
 ]
